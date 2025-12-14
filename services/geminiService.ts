@@ -32,12 +32,12 @@ export const parseMenuImage = async (
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // 1. 初始化 SDK
+  // 1. 初始化 SDK (使用 @google/generative-ai 的寫法)
   const genAI = new GoogleGenerativeAI(apiKey);
   
   // 2. 指定使用最新的 gemini-2.5-flash 模型
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash", // <--- 這裡改成了 2.5
+    model: "gemini-2.5-flash", // <--- 沒錯，這裡直接寫 2.5
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
