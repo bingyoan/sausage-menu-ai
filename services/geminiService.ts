@@ -1,23 +1,23 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { MenuItem, MenuData, TargetLanguage } from '../types';
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 
-// Schema for the menu parsing response
-const menuSchema: Schema = {
-  type: Type.OBJECT,
+// 定義回傳格式 (Schema)
+const menuSchema = {
+  type: SchemaType.OBJECT,
   properties: {
-    originalCurrency: { type: Type.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
-    exchangeRate: { type: Type.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
-    detectedLanguage: { type: Type.STRING, description: "The primary language detected on the menu." },
+    originalCurrency: { type: SchemaType.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
+    exchangeRate: { type: SchemaType.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
+    detectedLanguage: { type: SchemaType.STRING, description: "The primary language detected on the menu." },
     items: {
-      type: Type.ARRAY,
+      type: SchemaType.ARRAY,
       items: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          originalName: { type: Type.STRING },
-          translatedName: { type: Type.STRING },
-          price: { type: Type.NUMBER, description: "Numeric price value only. If the menu lists tax-inclusive prices, use that." },
-          category: { type: Type.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
+          originalName: { type: SchemaType.STRING },
+          translatedName: { type: SchemaType.STRING },
+          price: { type: SchemaType.NUMBER, description: "Numeric price value only. Use tax-inclusive price if available." },
+          category: { type: SchemaType.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
         },
         required: ["originalName", "translatedName", "price"],
       },
@@ -28,16 +28,27 @@ const menuSchema: Schema = {
 
 export const parseMenuImage = async (
   apiKey: string,
-  base64Images: string[], // Changed to accept array
+  base64Images: string[], 
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // Initialize AI with the user's key
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  // 1. 初始化 SDK
+  const genAI = new GoogleGenerativeAI(apiKey);
+  
+  // 2. 指定使用最新的 gemini-2.5-flash 模型
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash", // <--- 這裡改成了 2.5
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: menuSchema,
+    },
+    systemInstruction: "You are a precise OCR and translation engine. You may receive 1 to 3 images of a single menu. Merge the information into a structured list. Ignore decorative text. Always group items by category. Always prefer tax-inclusive final prices."
+  });
+
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   const prompt = `
-    You are a smart menu assistant.
+    You are a smart menu assistant using the advanced capabilities of Gemini 2.5.
     1. Analyze the provided ${base64Images.length} menu image(s).
     2. Extract all food and drink items from ALL images.
     3. Merge duplicates if the images overlap, but ensure unique items are preserved.
@@ -49,31 +60,25 @@ export const parseMenuImage = async (
     9. Return a SINGLE JSON object containing combined data.
   `;
 
-  // Prepare parts: text prompt + all images
-  const parts: any[] = [{ text: prompt }];
-  base64Images.forEach(img => {
-      parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
-  });
+  // 3. 準備圖片資料
+  const imageParts = base64Images.map(img => ({
+    inlineData: {
+      data: img,
+      mimeType: "image/jpeg"
+    }
+  }));
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: parts
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: menuSchema,
-        systemInstruction: "You are a precise OCR and translation engine. You may receive 1 to 3 images of a single menu. Merge the information into a structured list. Ignore decorative text. Always group items by category. Always prefer tax-inclusive final prices."
-      }
-    });
+    // 4. 發送請求
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const text = response.text();
 
-    const text = response.text;
     if (!text) throw new Error("No response from AI");
 
     const parsed = JSON.parse(text);
 
-    // Add unique IDs to items
+    // 加上唯一 ID
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
@@ -101,8 +106,9 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   
-  // Initialize AI with the user's key
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  const genAI = new GoogleGenerativeAI(apiKey);
+  // 解說菜色也同步使用 2.5
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `
     Explain the dish "${dishName}" (which is in ${originalLang}).
@@ -112,15 +118,9 @@ export const explainDish = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'text/plain',
-      }
-    });
-
-    return response.text || "No explanation available.";
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text() || "No explanation available.";
   } catch (error) {
     console.error("Gemini Explain Error:", error);
     return "Could not load explanation.";
