@@ -32,14 +32,19 @@ export const parseMenuImage = async (
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // 1. 初始化 SDK
-  // 這裡加個 log 方便你在 F12 檢查到底傳了什麼 Key 進去 (只顯示前 5 碼)
-  console.log("Using API Key:", apiKey?.substring(0, 5) + "..."); 
+  // 🛡️【關鍵修正】清洗 API Key：只保留英文、數字和標準符號
+  // 這會自動移除中文、全形空格、換行符號，解決 "non ISO-8859-1" 錯誤
+  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  // 檢查清洗後是否為空
+  if (!cleanApiKey) {
+    throw new Error("Invalid API Key: Contains non-standard characters.");
+  }
+
+  // 1. 初始化 SDK (使用清洗後的 Key)
+  const genAI = new GoogleGenerativeAI(cleanApiKey);
   
-  // 2. 改回最標準的 "gemini-1.5-flash"
-  // 只要 Key 是新的且權限正確，這個名稱絕對能用。
+  // 2. 指定使用 "gemini-1.5-flash" (最穩定版本)
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash", 
     generationConfig: {
@@ -103,7 +108,9 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   
-  const genAI = new GoogleGenerativeAI(apiKey);
+  // 同樣進行清洗
+  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
+  const genAI = new GoogleGenerativeAI(cleanApiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const prompt = `
