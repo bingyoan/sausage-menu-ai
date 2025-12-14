@@ -35,10 +35,9 @@ export const parseMenuImage = async (
   // 1. 初始化 SDK
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // 2. 指定使用 gemini-1.5-flash (目前最穩定支援 Schema 的版本)
-  // 如果你想試試看 2.0 預覽版，可以改成 "gemini-2.0-flash-exp"
+  // 2. 指定使用最穩定的 gemini-1.5-flash 模型 (解決 404 問題)
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash", 
+    model: "gemini-1.5-flash", // <--- 這裡改回了 1.5
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -108,6 +107,7 @@ export const explainDish = async (
 ): Promise<string> => {
   
   const genAI = new GoogleGenerativeAI(apiKey);
+  // 解說部分也要改回 1.5
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const prompt = `
