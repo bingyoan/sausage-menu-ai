@@ -26,18 +26,20 @@ const App: React.FC = () => {
   // Modal State
   const [showLicenseModal, setShowLicenseModal] = useState<boolean>(false);
 
-  // Settings Modal (Optional, mostly replaced by WelcomeScreen inputs but kept for other screens)
+  // Settings Modal (Optional)
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // 1. Initialization: Load Storage
   useEffect(() => {
-    // Load standard storage
+    // Load History
     const savedHistory = localStorage.getItem('sausage_menu_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
 
-    const savedApiKey = localStorage.getItem('sausage_api_key');
+    // Load Google API Key
+    const savedApiKey = localStorage.getItem('sausage_google_api_key');
     if (savedApiKey) setApiKey(savedApiKey);
 
+    // Load License Key
     const savedLicenseKey = localStorage.getItem('sausage_license_key');
     if (savedLicenseKey) {
         setLicenseKey(savedLicenseKey);
@@ -45,7 +47,18 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // 2. License Verification Logic
+  // 2. Persistence: Auto-save Google API Key whenever it changes
+  useEffect(() => {
+    if (apiKey) {
+      localStorage.setItem('sausage_google_api_key', apiKey);
+    } else {
+      // Only remove if it's explicitly cleared (and not just initial empty state if we want to be strict, 
+      // but keeping it simple: if state is empty, storage matches)
+      localStorage.removeItem('sausage_google_api_key');
+    }
+  }, [apiKey]);
+
+  // 3. License Verification Logic
   const verifyLicense = async (key: string, isAutoCheck = false): Promise<boolean> => {
     try {
       const response = await fetch('/api/verify', {
@@ -61,13 +74,18 @@ const App: React.FC = () => {
       if (data.success && !data.purchase.refunded && !data.purchase.chargebacked) {
         setIsVerified(true);
         setLicenseKey(key.trim());
+        // Save to storage on success
         localStorage.setItem('sausage_license_key', key.trim());
         return true;
       } else {
-        if (isAutoCheck) {
-             setIsVerified(false);
-             // Don't remove key immediately on auto-check failure to prevent flickering if offline,
-             // but strictly speaking, we should invalidate permission.
+        setIsVerified(false);
+        // If automatic check fails (e.g., refunded), or manual check fails, clear storage
+        if (!isAutoCheck) {
+            localStorage.removeItem('sausage_license_key'); 
+        } else {
+            // Optional: If auto-check fails (e.g. key revoked), strictly we should remove it.
+            // But sometimes network fails. We'll leave it in storage for retry unless explicitly invalid.
+            // For now, let's keep it safe and not delete on network error, but update UI state.
         }
         return false;
       }
@@ -77,12 +95,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Wrapper to update state (useEffect handles persistence)
   const handleApiKeyChange = (key: string) => {
       setApiKey(key);
-      localStorage.setItem('sausage_api_key', key);
   };
 
-  // 3. Image Handling (Strict License Check)
+  // 4. Image Handling (Strict License Check)
   const handleImagesSelected = async (files: File[]) => {
     if (!apiKey) {
         alert("Please enter a Google API Key first.");
