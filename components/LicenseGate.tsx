@@ -30,14 +30,13 @@ export const LicenseGate: React.FC<LicenseGateProps> = ({ children }) => {
     setError(null);
 
     try {
-      // Gumroad API verify endpoint
-      const response = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+      // Call local Vercel API function instead of Gumroad directly
+      const response = await fetch('/api/verify', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        // Gumroad expects URL encoded body
-        body: new URLSearchParams({
+        body: JSON.stringify({
           product_permalink: GUMROAD_PRODUCT_PERMALINK,
           license_key: key.trim(),
         }),
