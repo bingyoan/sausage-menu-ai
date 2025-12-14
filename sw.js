@@ -1,62 +1,28 @@
-// Service Worker for Sausage Menu Pal
-const CACHE_NAME = 'sausage-menu-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap'
+// public/sw.js - 安全版
+const CACHE_NAME = 'sausage-ai-v1';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/manifest.json'
 ];
 
-// Install Event
 self.addEventListener('install', (event) => {
+  // 立即控制頁面，不等待
+  self.skipWaiting(); 
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        // 嘗試快取核心檔案，如果失敗就忽略 (避免 CORS 錯誤卡死)
+        return cache.addAll(urlsToCache).catch(err => console.log('Cache ignored:', err));
+      })
   );
 });
 
-// Fetch Event - Stale-While-Revalidate strategy
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Return cached response if available
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Check if we received a valid response
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
-        }
-
-        // Clone the response
-        const responseToCache = networkResponse.clone();
-
-        // Update the cache with the new response
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
-  );
-});
-
-// Activate Event - Cleanup old caches
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+  event.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  // 這裡留空，讓它預設直接連網，不要攔截請求
+  // 這樣就能解決 Tailwind CDN 被擋住的問題
 });
