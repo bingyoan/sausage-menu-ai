@@ -1,6 +1,5 @@
 // api/verify.js
 export default async function handler(req, res) {
-  // 1. 設定 CORS (允許瀏覽器連線)
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -9,17 +8,13 @@ export default async function handler(req, res) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
   );
 
-  // 2. 處理預檢請求
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
   try {
-    // 3. 強制解析 body (這是最容易出錯的地方)
     let body = req.body;
-    
-    // 如果收到的是字串，嘗試轉成 JSON
     if (typeof body === 'string') {
       try {
         body = JSON.parse(body);
@@ -30,42 +25,37 @@ export default async function handler(req, res) {
 
     const { product_permalink, license_key } = body || {};
 
-    // 4. 檢查參數是否存在
-    if (!product_permalink || !license_key) {
-      console.error('Missing parameters:', { product_permalink, license_key });
-      return res.status(400).json({ 
-        error: 'Missing parameters', 
-        received: { product_permalink, license_key } 
-      });
+    if (!license_key) {
+      return res.status(400).json({ error: 'Missing license_key' });
     }
 
-    console.log(`Verifying: ${license_key} against ${product_permalink}`);
+    console.log(`Verifying license: ${license_key}`);
 
-    // 5. 呼叫 Gumroad API
+    // Gumroad API 呼叫
     const response = await fetch('https://api.gumroad.com/v2/licenses/verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      // 確保轉為 Gumroad 看得懂的格式
+      // 關鍵修改：這裡加入了 product_id
       body: new URLSearchParams({
-        product_permalink,
-        license_key,
+        product_permalink: product_permalink, // 雖然它報錯，但留著當備用
+        product_id: '1J6_TrvcwHfoTE-wHhfDaA==', // <--- 這是錯誤訊息要求加上的
+        license_key: license_key,
       }).toString(),
     });
 
     const data = await response.json();
     
-    // 6. 回傳結果
-    console.log('Gumroad response:', data.success);
+    // 如果 Gumroad 回傳錯誤，將詳細訊息印出來
+    if (!data.success) {
+        console.error('Gumroad Verification Failed:', data);
+    }
+    
     return res.status(200).json(data);
 
   } catch (error) {
-    // 7. 如果當機，回傳詳細錯誤原因
     console.error('Server Error:', error);
-    return res.status(500).json({ 
-      error: 'Internal Server Error', 
-      message: error.message 
-    });
+    return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 }
