@@ -7,8 +7,9 @@ import { OrderingPage } from './components/OrderingPage';
 import { OrderSummary } from './components/OrderSummary';
 import { HistoryPage } from './components/HistoryPage';
 import { SettingsModal } from './components/SettingsModal';
-import { LicenseGate } from './components/LicenseGate';
+import { LicenseModal } from './components/LicenseModal';
 import { parseMenuImage } from './services/geminiService';
+import { GUMROAD_PRODUCT_PERMALINK } from './constants';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('welcome');
@@ -17,30 +18,121 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<Cart>({});
   const [history, setHistory] = useState<HistoryRecord[]>([]);
   
-  // API Key Management
+  // Auth & Permissions
   const [apiKey, setApiKey] = useState<string>('');
+  const [licenseKey, setLicenseKey] = useState<string>('');
+  const [isVerified, setIsVerified] = useState<boolean>(false);
+  
+  // Modal State
+  const [showLicenseModal, setShowLicenseModal] = useState<boolean>(false);
+
+  // Settings Modal (Optional, mostly replaced by WelcomeScreen inputs but kept for other screens)
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  // Load history and key from local storage on mount
+  // 1. Initialization: Load Storage
   useEffect(() => {
+    // Load standard storage
     const savedHistory = localStorage.getItem('sausage_menu_history');
-    if (savedHistory) {
-        try {
-            setHistory(JSON.parse(savedHistory));
-        } catch (e) {
-            console.error("Failed to load history", e);
-        }
-    }
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
 
-    const savedKey = localStorage.getItem('sausage_api_key');
-    if (savedKey) {
-        setApiKey(savedKey);
+    const savedApiKey = localStorage.getItem('sausage_api_key');
+    if (savedApiKey) setApiKey(savedApiKey);
+
+    const savedLicenseKey = localStorage.getItem('sausage_license_key');
+    if (savedLicenseKey) {
+        setLicenseKey(savedLicenseKey);
+        verifyLicense(savedLicenseKey, true); // Auto verify on load
     }
   }, []);
 
-  const handleSaveKey = (key: string) => {
+  // 2. License Verification Logic
+  const verifyLicense = async (key: string, isAutoCheck = false): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_permalink: GUMROAD_PRODUCT_PERMALINK,
+          license_key: key.trim(),
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success && !data.purchase.refunded && !data.purchase.chargebacked) {
+        setIsVerified(true);
+        setLicenseKey(key.trim());
+        localStorage.setItem('sausage_license_key', key.trim());
+        return true;
+      } else {
+        if (isAutoCheck) {
+             setIsVerified(false);
+             // Don't remove key immediately on auto-check failure to prevent flickering if offline,
+             // but strictly speaking, we should invalidate permission.
+        }
+        return false;
+      }
+    } catch (err) {
+      console.error("Verification Error", err);
+      return false;
+    }
+  };
+
+  const handleApiKeyChange = (key: string) => {
       setApiKey(key);
       localStorage.setItem('sausage_api_key', key);
+  };
+
+  // 3. Image Handling (Strict License Check)
+  const handleImagesSelected = async (files: File[]) => {
+    if (!apiKey) {
+        alert("Please enter a Google API Key first.");
+        return;
+    }
+
+    if (files.length === 0) return;
+
+    // Strict Permission Check: Must be verified
+    if (!isVerified) {
+        setShowLicenseModal(true);
+        return;
+    }
+
+    // Limit to 3 images
+    const filesToProcess = files.slice(0, 3);
+    if (files.length > 3) {
+        alert("Maximum 3 images allowed. Processing the first 3.");
+    }
+
+    setAppState('processing');
+    
+    try {
+      // Convert all files to base64
+      const base64Promises = filesToProcess.map(file => {
+          return new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                  const result = reader.result as string;
+                  resolve(result.split(',')[1]);
+              };
+              reader.readAsDataURL(file);
+          });
+      });
+
+      const base64Images = await Promise.all(base64Promises);
+
+      try {
+        const data = await parseMenuImage(apiKey, base64Images, targetLanguage);
+        setMenuData(data);
+        setAppState('ordering');
+      } catch (error) {
+        console.error(error);
+        alert("Failed to parse menu. Please check your API Key and try again.");
+        setAppState('welcome');
+      }
+    } catch (error) {
+      console.error(error);
+      setAppState('welcome');
+    }
   };
 
   const saveToHistory = () => {
@@ -61,7 +153,6 @@ const App: React.FC = () => {
     setHistory(newHistory);
     localStorage.setItem('sausage_menu_history', JSON.stringify(newHistory));
     
-    // Reset and go home
     setCart({});
     setMenuData(null);
     setAppState('welcome');
@@ -73,76 +164,49 @@ const App: React.FC = () => {
     localStorage.setItem('sausage_menu_history', JSON.stringify(newHistory));
   };
 
-  const handleImageSelected = async (file: File) => {
-    if (!apiKey) {
-        setShowSettings(true);
-        return;
-    }
-
-    setAppState('processing');
-    
-    try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = (reader.result as string).split(',')[1];
-        try {
-          const data = await parseMenuImage(apiKey, base64String, targetLanguage);
-          setMenuData(data);
-          setAppState('ordering');
-        } catch (error) {
-          console.error(error);
-          alert("Failed to parse menu. Please check your API Key and try again.");
-          setAppState('welcome');
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error(error);
-      setAppState('welcome');
-    }
-  };
-
   const updateCart = (itemId: string, delta: number) => {
     if (!menuData) return;
-    
     setCart(prev => {
       const currentQty = prev[itemId]?.quantity || 0;
       const newQty = Math.max(0, currentQty + delta);
-      
       const newCart = { ...prev };
-      
       if (newQty === 0) {
         delete newCart[itemId];
       } else {
         const item = menuData.items.find(i => i.id === itemId);
-        if (item) {
-            newCart[itemId] = { item, quantity: newQty };
-        }
+        if (item) newCart[itemId] = { item, quantity: newQty };
       }
       return newCart;
     });
   };
 
-  // The LicenseGate wraps the main application
   return (
-    <LicenseGate>
-      <div className="h-full w-full max-w-md mx-auto bg-white shadow-2xl relative">
+    <div className="h-full w-full max-w-md mx-auto bg-white shadow-2xl relative">
         <SettingsModal 
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
-          onSave={handleSaveKey}
+          onSave={handleApiKeyChange}
           currentKey={apiKey}
+        />
+
+        <LicenseModal 
+            isOpen={showLicenseModal}
+            onClose={() => setShowLicenseModal(false)}
+            onVerify={verifyLicense}
         />
 
         {appState === 'welcome' && (
           <WelcomeScreen 
             selectedLanguage={targetLanguage} 
             onLanguageChange={setTargetLanguage}
-            onImageSelected={handleImageSelected}
+            onImagesSelected={handleImagesSelected}
             onViewHistory={() => setAppState('history')}
-            onOpenSettings={() => setShowSettings(true)}
-            hasKey={!!apiKey}
+            
+            apiKey={apiKey}
+            onApiKeyChange={handleApiKeyChange}
+            licenseKey={licenseKey}
+            isVerified={isVerified}
+            onVerifyLicense={verifyLicense}
           />
         )}
 
@@ -184,7 +248,6 @@ const App: React.FC = () => {
           />
         )}
       </div>
-    </LicenseGate>
   );
 };
 

@@ -28,7 +28,7 @@ const menuSchema: Schema = {
 
 export const parseMenuImage = async (
   apiKey: string,
-  base64Image: string,
+  base64Images: string[], // Changed to accept array
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
@@ -38,29 +38,33 @@ export const parseMenuImage = async (
   
   const prompt = `
     You are a smart menu assistant.
-    1. Analyze the provided menu image.
-    2. Extract all food and drink items.
-    3. Group them into categories exactly as they appear on the menu (e.g. Appetizers, Mains, Drinks). Use "Main" or "Others" if unclear.
-    4. Translate the item names into ${targetLanguage}.
-    5. Detect the currency.
-    6. **CRITICAL PRICE RULE**: If the menu mentions tax (e.g., "+tax", "tax excluded"), please CALCULATE and provide the final TAX-INCLUSIVE price if possible. If the menu shows both pre-tax and post-tax prices, USE THE POST-TAX (higher) PRICE.
-    7. Provide an estimated exchange rate from Menu Currency to ${targetCurrency}.
-    8. Return a JSON object.
+    1. Analyze the provided ${base64Images.length} menu image(s).
+    2. Extract all food and drink items from ALL images.
+    3. Merge duplicates if the images overlap, but ensure unique items are preserved.
+    4. Group them into categories exactly as they appear on the menu (e.g. Appetizers, Mains, Drinks). Use "Main" or "Others" if unclear.
+    5. Translate the item names into ${targetLanguage}.
+    6. Detect the currency.
+    7. **CRITICAL PRICE RULE**: If the menu mentions tax (e.g., "+tax", "tax excluded"), please CALCULATE and provide the final TAX-INCLUSIVE price if possible. If the menu shows both pre-tax and post-tax prices, USE THE POST-TAX (higher) PRICE.
+    8. Provide an estimated exchange rate from Menu Currency to ${targetCurrency}.
+    9. Return a SINGLE JSON object containing combined data.
   `;
+
+  // Prepare parts: text prompt + all images
+  const parts: any[] = [{ text: prompt }];
+  base64Images.forEach(img => {
+      parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
+  });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: {
-        parts: [
-          { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
-          { text: prompt }
-        ]
+        parts: parts
       },
       config: {
         responseMimeType: 'application/json',
         responseSchema: menuSchema,
-        systemInstruction: "You are a precise OCR and translation engine for restaurant menus. Ignore decorative text. Always group items by category. Always prefer tax-inclusive final prices."
+        systemInstruction: "You are a precise OCR and translation engine. You may receive 1 to 3 images of a single menu. Merge the information into a structured list. Ignore decorative text. Always group items by category. Always prefer tax-inclusive final prices."
       }
     });
 
