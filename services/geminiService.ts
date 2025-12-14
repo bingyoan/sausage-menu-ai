@@ -32,13 +32,12 @@ export const parseMenuImage = async (
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // 1. 初始化 SDK (使用 @google/generative-ai 的寫法，解決 TS2307 錯誤)
+  // 1. 初始化 SDK
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // 2. 指定使用 "gemini-1.5-flash"
-  // "Flash" 系列是 Google 專門為了低延遲、高速度設計的模型，最適合加速。
+  // 2. 指定使用 "gemini-1.5-flash-001" (使用具體版號，解決 404 問題)
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash", 
+    model: "gemini-1.5-flash-001", // <--- 這裡改成了 -001
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -48,7 +47,6 @@ export const parseMenuImage = async (
 
   const targetCurrency = getTargetCurrency(targetLanguage);
   
-  // 優化 Prompt 以提升速度：減少廢話，直接要求結果
   const prompt = `
     TASK: Analyze ${base64Images.length} menu image(s).
     1. Extract items (Food/Drink).
@@ -105,8 +103,8 @@ export const explainDish = async (
 ): Promise<string> => {
   
   const genAI = new GoogleGenerativeAI(apiKey);
-  // 解說也用 Flash 加速
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // 解說部分也改用具體版號
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
   const prompt = `
     Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 
