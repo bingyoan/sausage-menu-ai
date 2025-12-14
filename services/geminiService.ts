@@ -35,9 +35,10 @@ export const parseMenuImage = async (
   // 1. 初始化 SDK
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // 2. 指定使用最穩定的 gemini-1.5-flash 模型 (解決 404 問題)
+  // 2. 使用 "gemini-1.5-flash-latest" 或是 "gemini-1.5-flash-001"
+  // 這樣可以避免 404 找不到模型的錯誤
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash", // <--- 這裡改回了 1.5
+    model: "gemini-1.5-flash-latest", 
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -107,8 +108,8 @@ export const explainDish = async (
 ): Promise<string> => {
   
   const genAI = new GoogleGenerativeAI(apiKey);
-  // 解說部分也要改回 1.5
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // 解說部分也要改
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
   const prompt = `
     Explain the dish "${dishName}" (which is in ${originalLang}).
