@@ -35,10 +35,9 @@ export const parseMenuImage = async (
   // 1. 初始化 SDK
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // 2. 使用 "gemini-1.5-flash-latest" 或是 "gemini-1.5-flash-001"
-  // 這樣可以避免 404 找不到模型的錯誤
+  // 2. 指定使用最新的 gemini-2.5-flash 模型
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest", 
+    model: "gemini-2.5-flash", // <--- 這裡改回了 2.5
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -49,7 +48,7 @@ export const parseMenuImage = async (
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   const prompt = `
-    You are a smart menu assistant.
+    You are a smart menu assistant using the advanced capabilities of Gemini 2.5.
     1. Analyze the provided ${base64Images.length} menu image(s).
     2. Extract all food and drink items from ALL images.
     3. Merge duplicates if the images overlap, but ensure unique items are preserved.
@@ -108,8 +107,8 @@ export const explainDish = async (
 ): Promise<string> => {
   
   const genAI = new GoogleGenerativeAI(apiKey);
-  // 解說部分也要改
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+  // 解說部分也同步改成 2.5
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `
     Explain the dish "${dishName}" (which is in ${originalLang}).
