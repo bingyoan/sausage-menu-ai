@@ -52,8 +52,6 @@ const App: React.FC = () => {
     if (apiKey) {
       localStorage.setItem('sausage_google_api_key', apiKey);
     } else {
-      // Only remove if it's explicitly cleared (and not just initial empty state if we want to be strict, 
-      // but keeping it simple: if state is empty, storage matches)
       localStorage.removeItem('sausage_google_api_key');
     }
   }, [apiKey]);
@@ -79,13 +77,8 @@ const App: React.FC = () => {
         return true;
       } else {
         setIsVerified(false);
-        // If automatic check fails (e.g., refunded), or manual check fails, clear storage
         if (!isAutoCheck) {
             localStorage.removeItem('sausage_license_key'); 
-        } else {
-            // Optional: If auto-check fails (e.g. key revoked), strictly we should remove it.
-            // But sometimes network fails. We'll leave it in storage for retry unless explicitly invalid.
-            // For now, let's keep it safe and not delete on network error, but update UI state.
         }
         return false;
       }
@@ -95,9 +88,53 @@ const App: React.FC = () => {
     }
   };
 
-  // Wrapper to update state (useEffect handles persistence)
+  // Wrapper to update state
   const handleApiKeyChange = (key: string) => {
       setApiKey(key);
+  };
+
+  // Helper: Compress Image using Canvas
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1024; // Resize to max 1024px width for speed
+          const MAX_HEIGHT = 1024;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress to JPEG with 0.6 quality
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+            resolve(dataUrl.split(',')[1]); // Return base64 body
+          } else {
+             reject(new Error("Canvas context failed"));
+          }
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
   };
 
   // 4. Image Handling (Strict License Check)
@@ -124,18 +161,8 @@ const App: React.FC = () => {
     setAppState('processing');
     
     try {
-      // Convert all files to base64
-      const base64Promises = filesToProcess.map(file => {
-          return new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                  const result = reader.result as string;
-                  resolve(result.split(',')[1]);
-              };
-              reader.readAsDataURL(file);
-          });
-      });
-
+      // Compress and convert all files to base64
+      const base64Promises = filesToProcess.map(file => compressImage(file));
       const base64Images = await Promise.all(base64Promises);
 
       try {
@@ -148,7 +175,8 @@ const App: React.FC = () => {
         setAppState('welcome');
       }
     } catch (error) {
-      console.error(error);
+      console.error("Image processing error:", error);
+      alert("Error processing images.");
       setAppState('welcome');
     }
   };
