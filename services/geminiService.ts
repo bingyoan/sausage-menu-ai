@@ -33,11 +33,15 @@ export const parseMenuImage = async (
 ): Promise<MenuData> => {
   
   // 1. 初始化 SDK
+  // 這裡加個 log 方便你在 F12 檢查到底傳了什麼 Key 進去 (只顯示前 5 碼)
+  console.log("Using API Key:", apiKey?.substring(0, 5) + "..."); 
+
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // 2. 指定使用 "gemini-1.5-flash-001" (使用具體版號，解決 404 問題)
+  // 2. 改回最標準的 "gemini-1.5-flash"
+  // 只要 Key 是新的且權限正確，這個名稱絕對能用。
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-001", // <--- 這裡改成了 -001
+    model: "gemini-1.5-flash", 
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -56,7 +60,6 @@ export const parseMenuImage = async (
     5. Return SINGLE JSON.
   `;
 
-  // 3. 準備圖片資料
   const imageParts = base64Images.map(img => ({
     inlineData: {
       data: img,
@@ -65,7 +68,6 @@ export const parseMenuImage = async (
   }));
 
   try {
-    // 4. 發送請求
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const text = response.text();
@@ -74,7 +76,6 @@ export const parseMenuImage = async (
 
     const parsed = JSON.parse(text);
 
-    // 加上唯一 ID
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
@@ -103,8 +104,7 @@ export const explainDish = async (
 ): Promise<string> => {
   
   const genAI = new GoogleGenerativeAI(apiKey);
-  // 解說部分也改用具體版號
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const prompt = `
     Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 
