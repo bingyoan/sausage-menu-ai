@@ -1,17 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  // 告訴 Tailwind 去哪裡尋找 class name
   content: [
     "./index.html",
-    // 1. 搜尋所有放在「最外層」的檔案 (例如 App.tsx, main.tsx)
-    "./*.{js,ts,jsx,tsx}",            
-    // 2. 搜尋 components/ 資料夾內的所有檔案
-    "./components/**/*.{js,ts,jsx,tsx}", 
-    // 3. 搜尋 services/ 資料夾內的所有檔案
-    "./services/**/*.{js,ts,jsx,tsx}",   
+    "./*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+    "./services/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // ⚡️ 確保這個 colors 區塊存在，Tailwind 才能識別 sausage-xxx 樣式
+      colors: {
+        sausage: {
+          50: '#FFF0ED',  
+          100: '#FDD5CD', 
+          200: '#FCA08C', 
+          600: '#E85F39', // 這是您的主要橘色 (按鈕顏色)
+          700: '#D54D2A', 
+          800: '#99341B', 
+          900: '#331108', // 這是您的主要文字顏色
+        }
+      }
+    },
   },
   plugins: [],
 }
