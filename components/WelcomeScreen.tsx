@@ -1,149 +1,159 @@
-import React, { useRef } from 'react';
-import { Camera, Upload, Globe, History, Settings, CheckCircle, Lock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TargetLanguage } from '../types';
 import { LANGUAGE_OPTIONS } from '../constants';
-import { SausageDogLogo, PawPrint } from './DachshundAssets';
+import { Camera, History, Settings, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 interface WelcomeScreenProps {
-  onLanguageChange: (lang: TargetLanguage) => void;
   selectedLanguage: TargetLanguage;
+  onLanguageChange: (lang: TargetLanguage) => void;
   onImagesSelected: (files: File[]) => void;
   onViewHistory: () => void;
   onOpenSettings: () => void;
-  isVerified: boolean;
-  hasApiKey: boolean;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
-  onLanguageChange,
   selectedLanguage,
+  onLanguageChange,
   onImagesSelected,
   onViewHistory,
-  onOpenSettings,
-  isVerified,
-  hasApiKey
+  onOpenSettings
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      onImagesSelected(Array.from(e.target.files));
+  const [isAndroidApp, setIsAndroidApp] = useState(false);
+  const [isLicenseVerified, setIsLicenseVerified] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const platform = params.get('platform');
+    const savedLicense = localStorage.getItem('sausage_license_key');
+
+    if (platform === 'android') {
+      setIsAndroidApp(true);
+      setIsLicenseVerified(true);
+      localStorage.setItem('sausage_is_android_purchased', 'true');
+    } else if (savedLicense || localStorage.getItem('sausage_is_android_purchased')) {
+      setIsLicenseVerified(true);
+    }
+  }, []);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      onImagesSelected(Array.from(event.target.files));
+    }
+  };
+
+  const handleEnterLicense = () => {
+    const key = prompt("請輸入您的 Gumroad 序號：");
+    if (key === 'SAUSAGE-VIP') {
+        localStorage.setItem('sausage_license_key', key);
+        setIsLicenseVerified(true);
+        toast.success("序號驗證成功！");
+    } else if (key) {
+        toast.error("序號無效");
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-sausage-50 relative overflow-hidden">
-      {/* Background Decorations */}
-      <PawPrint className="absolute top-10 left-[-20px] w-24 h-24 text-sausage-200 opacity-50 rotate-[-15deg] pointer-events-none" />
-      <PawPrint className="absolute bottom-10 right-[-20px] w-40 h-40 text-sausage-200 opacity-50 rotate-[15deg] pointer-events-none" />
-
-      {/* Top Bar */}
-      <div className="flex justify-between p-4 z-20">
-         <button 
-            onClick={onOpenSettings}
-            className={`p-3 rounded-full transition-colors shadow-sm border border-sausage-100 flex items-center justify-center ${!hasApiKey ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-white text-sausage-700 hover:bg-sausage-50'}`}
-            title="Settings"
-        >
-            <Settings size={20} />
-        </button>
-
-        <button 
-            onClick={onViewHistory}
-            className="p-3 bg-white text-sausage-700 rounded-full hover:bg-sausage-50 transition-colors shadow-sm border border-sausage-100"
-            title="History"
-        >
-            <History size={20} />
-        </button>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 space-y-8">
-        
-        {/* Branding */}
-        <div className="z-10 text-center">
-            <div className="animate-bounce-slow inline-block">
-                 <SausageDogLogo className="w-48 h-32 mx-auto drop-shadow-lg" />
-            </div>
-            <h1 className="text-4xl font-extrabold text-sausage-900 mt-4 tracking-tight leading-tight">
-            Sausage Dog <br/><span className="text-sausage-600">Menu Pal</span>
-            </h1>
-            
-            <div className={`mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold shadow-sm border ${isVerified ? 'bg-white border-green-200 text-green-600' : 'bg-white border-sausage-200 text-sausage-600'}`}>
-                {isVerified ? (
-                    <><CheckCircle size={12}/> PRO UNLIMITED</>
-                ) : (
-                    <><Lock size={12}/> FREE MODE</>
-                )}
-            </div>
+    <div className="h-full flex flex-col bg-slate-50 relative">
+      <div className="flex justify-between items-center p-4 bg-white shadow-sm z-10">
+        <div className="flex items-center gap-2">
+           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-red-600">
+             Sausage Menu AI
+           </span>
+           {isAndroidApp && (
+             <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full flex items-center gap-1 font-medium">
+               <CheckCircle size={12} /> Pro
+             </span>
+           )}
         </div>
-
-        {/* Action Card */}
-        <div className="w-full max-w-sm bg-white p-6 rounded-[2rem] shadow-xl z-10 border-4 border-sausage-100 space-y-6">
-            
-            {/* Language Selector */}
-            <div className="bg-sausage-50 p-1 rounded-xl border border-sausage-200">
-                 <div className="flex items-center gap-2 px-3 py-2 text-sausage-800 font-bold text-xs uppercase tracking-wider mb-1">
-                    <Globe size={14} /> Translate to
-                </div>
-                <select
-                    value={selectedLanguage}
-                    onChange={(e) => onLanguageChange(e.target.value as TargetLanguage)}
-                    className="w-full p-3 bg-white rounded-lg shadow-sm text-sausage-900 focus:outline-none font-bold text-lg text-center"
-                >
-                    {LANGUAGE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                    </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Big Action Buttons */}
-            <div className="space-y-3">
-                <button
-                    onClick={() => cameraInputRef.current?.click()}
-                    disabled={!hasApiKey}
-                    className={`w-full py-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1 font-bold transition-all active:scale-95 border-b-4 ${hasApiKey ? 'bg-sausage-600 border-sausage-800 hover:bg-sausage-700 text-white' : 'bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed'}`}
-                >
-                    <Camera size={32} />
-                    <span className="text-lg">Take Photo</span>
-                </button>
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!hasApiKey}
-                    className={`w-full py-4 border-2 rounded-2xl flex items-center justify-center gap-2 font-bold transition-all active:scale-95 ${hasApiKey ? 'bg-white border-sausage-300 text-sausage-700 hover:bg-sausage-50' : 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'}`}
-                >
-                    <Upload size={20} />
-                    Upload from Gallery
-                </button>
-            </div>
-
-            {!hasApiKey && (
-                 <p className="text-xs text-red-500 text-center font-bold">
-                    ⚠️ Tap the Settings icon above to set your API Key.
-                 </p>
-            )}
+        <div className="flex gap-2">
+          <button onClick={onViewHistory} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+            <History size={24} />
+          </button>
+          <button onClick={onOpenSettings} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+            <Settings size={24} />
+          </button>
         </div>
       </div>
 
-      {/* Hidden Inputs */}
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        capture="environment"
-        ref={cameraInputRef}
-        className="hidden"
-        onChange={handleFileChange}
-      />
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        ref={fileInputRef}
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-8 overflow-y-auto">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center space-y-4"
+        >
+          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-orange-400 to-red-500 rounded-3xl shadow-xl flex items-center justify-center transform rotate-3">
+            <span className="text-6xl">🌭</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">今天想吃什麼？</h1>
+            <p className="text-slate-500">拍下菜單，讓我幫你避開地雷</p>
+          </div>
+        </motion.div>
+
+        <div className="w-full max-w-xs bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+          <label className="text-sm font-medium text-slate-400 mb-2 block uppercase tracking-wider">翻譯目標語言</label>
+          <div className="grid grid-cols-2 gap-2">
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => onLanguageChange(lang.code)}
+                className={`p-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  selectedLanguage === lang.code
+                    ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <span>{lang.flag}</span>
+                {lang.label.split(' ')[1] || lang.label} 
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!isAndroidApp && !isLicenseVerified && (
+             <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="w-full max-w-xs"
+             >
+                <button 
+                  onClick={handleEnterLicense}
+                  className="w-full py-3 px-4 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-xl text-sm font-medium hover:bg-yellow-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="text-lg">🔑</span> 
+                  我是網頁版用戶 (輸入序號)
+                </button>
+                <p className="text-xs text-center text-slate-400 mt-2">
+                  Android 用戶請下載 App 即可免序號
+                </p>
+             </motion.div>
+        )}
+
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+        />
+      </div>
+
+      <div className="p-6 bg-white border-t border-slate-100 pb-8">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center justify-center gap-3"
+        >
+          <Camera size={24} />
+          {isLicenseVerified ? '開始掃描菜單' : '試用掃描 (免序號)'}
+        </button>
+        <p className="text-center text-xs text-slate-400 mt-4">
+          Powered by Google Gemini 2.0 Flash
+        </p>
+      </div>
     </div>
   );
 };

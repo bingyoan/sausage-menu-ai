@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Minus, Plus, ShoppingCart, HelpCircle, AlertTriangle, Info, Flame } from 'lucide-react';
-import { MenuItem, MenuData, Cart, TargetLanguage, CartItem } from '../types';
+import React, { useState } from 'react';
+import { MenuData, Cart, TargetLanguage } from '../types';
+import { ShoppingCart, ArrowLeft, AlertTriangle, Info } from 'lucide-react';
 import { explainDish } from '../services/geminiService';
-import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 interface OrderingPageProps {
@@ -22,218 +21,138 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
   targetLang,
   onUpdateCart,
   onViewSummary,
-  onBack,
+  onBack
 }) => {
-  const [activeCategory, setActiveCategory] = useState<string>(menuData.items[0]?.category || 'General');
-  const [explanations, setExplanations] = useState<Record<string, string>>({});
-  const [loadingExplanation, setLoadingExplanation] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [explainingId, setExplainingId] = useState<string | null>(null);
 
-  // Group items by category
-  const groupedItems = useMemo<Record<string, MenuItem[]>>(() => {
-    const groups: Record<string, MenuItem[]> = {};
-    menuData.items.forEach(item => {
-      const cat = item.category || 'Others';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
-    });
-    return groups;
-  }, [menuData.items]);
+  if (!menuData || !menuData.items) {
+      return <div>Loading...</div>;
+  }
 
-  const categories = Object.keys(groupedItems);
+  const categories = ['All', ...Array.from(new Set(menuData.items.map(i => i.category)))];
+  
+  const displayedItems = selectedCategory === 'All' 
+    ? menuData.items 
+    : menuData.items.filter(i => i.category === selectedCategory);
 
-  const cartValues = Object.values(cart) as CartItem[];
-  const totalPrice = cartValues.reduce((sum, cartItem) => sum + (cartItem.item.price * cartItem.quantity), 0);
-  const totalConverted = totalPrice * menuData.exchangeRate;
-  const totalItems = cartValues.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = Object.values(cart).reduce((sum, item) => sum + (item.item.price * item.quantity), 0);
 
-  const handleExplain = async (item: MenuItem) => {
-    if (explanations[item.id]) return;
-    setLoadingExplanation(item.id);
-    const text = await explainDish(apiKey, item.originalName, menuData.detectedLanguage, targetLang);
-    setExplanations(prev => ({ ...prev, [item.id]: text }));
-    setLoadingExplanation(null);
-  };
-
-  const scrollToCategory = (cat: string) => {
-      setActiveCategory(cat);
-      const element = document.getElementById(`cat-${cat}`);
-      if(element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+  const handleExplain = async (item: any) => {
+    setExplainingId(item.id);
+    try {
+      const explanation = await explainDish(apiKey, item.originalName, menuData.detectedLanguage, targetLang);
+      toast(explanation, { icon: '🧑‍🍳', duration: 4000 });
+    } catch (e) {
+      toast.error("無法取得解說");
+    } finally {
+      setExplainingId(null);
+    }
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 relative">
-      {/* Sticky Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="flex items-center gap-2 p-3 border-b border-gray-100">
-            <button onClick={onBack} className="p-2 text-sausage-800 hover:bg-sausage-50 rounded-full">
-                <ArrowLeft size={24} />
-            </button>
-            <div className="flex-1">
-                <h2 className="font-bold text-sausage-900 leading-tight">Menu</h2>
-                <p className="text-xs text-gray-500">{menuData.items.length} dishes found</p>
-            </div>
-            <div className="bg-sausage-100 text-sausage-800 px-3 py-1 rounded-full text-xs font-bold border border-sausage-200">
-                1 {menuData.originalCurrency} ≈ {menuData.exchangeRate.toFixed(2)} {menuData.targetCurrency}
-            </div>
-          </div>
-          
-          {/* Scrollable Categories Tabs */}
-          <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 bg-white/95 backdrop-blur-sm">
-             {categories.map(cat => (
-                 <button
-                    key={cat}
-                    onClick={() => scrollToCategory(cat)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                        activeCategory === cat 
-                        ? 'bg-sausage-600 text-white shadow-md' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                 >
-                     {cat}
-                 </button>
-             ))}
-          </div>
+    <div className="h-full flex flex-col bg-slate-50">
+      <div className="bg-white p-4 shadow-sm flex items-center justify-between z-10 sticky top-0">
+        <button onClick={onBack} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="font-bold text-lg text-slate-800">點餐中</h2>
+        <div className="w-10"></div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-32">
-        {categories.map((category) => (
-          <div key={category} id={`cat-${category}`} className="scroll-mt-36">
-            <h3 className="text-xl font-black text-sausage-900 mb-4 flex items-center gap-2">
-                <div className="w-2 h-6 bg-sausage-500 rounded-full"></div>
-                {category}
-            </h3>
-            
-            <div className="grid gap-4">
-              {groupedItems[category].map((item) => {
-                const quantity = cart[item.id]?.quantity || 0;
-                const convertedPrice = (item.price * menuData.exchangeRate).toFixed(0);
-                
-                return (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    key={item.id} 
-                    className={`bg-white rounded-2xl p-4 shadow-sm border-2 relative overflow-hidden ${quantity > 0 ? 'border-sausage-400 ring-2 ring-sausage-100' : 'border-gray-100'}`}
-                  >
-                    {/* Header: Names */}
-                    <div className="mb-2">
-                        <div className="flex justify-between items-start gap-2">
-                            <h4 className="font-extrabold text-gray-800 text-lg leading-tight">{item.translatedName}</h4>
-                            {item.allergy_warning && (
-                                <span className="shrink-0 bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                                    <AlertTriangle size={10} /> Allergen
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-sm text-gray-400 font-medium mt-0.5">{item.originalName}</p>
-                    </div>
+      <div className="overflow-x-auto p-4 flex gap-2 no-scrollbar bg-white border-b border-slate-100">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+              selectedCategory === cat 
+                ? 'bg-slate-800 text-white' 
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
 
-                    {/* AI Description Section - Highlighted */}
-                    <div className="bg-amber-50 rounded-xl p-3 mb-3 border border-amber-100 relative">
-                        {item.shortDescription && (
-                             <p className="text-amber-900 text-sm font-medium mb-2 leading-relaxed">
-                                {item.shortDescription}
-                             </p>
-                        )}
-                        
-                        {/* Tags */}
-                        {item.dietary_tags && item.dietary_tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                                {item.dietary_tags.map(tag => (
-                                    <span key={tag} className="text-[10px] bg-white text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded">
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+        {displayedItems.map(item => (
+          <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4">
+            <div className="flex-1 space-y-2">
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold text-slate-800">{item.translatedName}</h3>
+                <span className="font-medium text-orange-600">
+                  NT$ {Math.round(item.price * menuData.exchangeRate)}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">{item.originalName}</p>
+              <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                {item.description}
+              </p>
+              
+              <div className="flex flex-wrap gap-2 mt-2">
+                {item.allergy_warning && (
+                  <span className="px-2 py-1 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1 font-medium">
+                    <AlertTriangle size={12} /> 過敏注意
+                  </span>
+                )}
+                <button 
+                  onClick={() => handleExplain(item)}
+                  disabled={explainingId === item.id}
+                  className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg flex items-center gap-1 font-medium hover:bg-blue-100"
+                >
+                  <Info size={12} /> {explainingId === item.id ? '解說中...' : 'AI 食評'}
+                </button>
+              </div>
+            </div>
 
-                         {/* Explain Button / Result */}
-                        {explanations[item.id] ? (
-                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100">
-                                💡 {explanations[item.id]}
-                            </div>
-                        ) : (
-                             <button 
-                                onClick={() => handleExplain(item)}
-                                disabled={loadingExplanation === item.id}
-                                className="text-xs font-bold text-amber-600 hover:text-amber-800 flex items-center gap-1 mt-1 transition-colors"
-                            >
-                                {loadingExplanation === item.id ? 'Thinking...' : <><Info size={12}/> Detailed Explanation</>}
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Footer: Price & Controls */}
-                    <div className="flex items-center justify-between mt-2">
-                        <div>
-                             <span className="block font-black text-xl text-sausage-900">
-                                {convertedPrice} <span className="text-xs font-bold text-sausage-600">{menuData.targetCurrency}</span>
-                             </span>
-                             <span className="text-xs text-gray-400 font-mono">
-                                {item.price} {menuData.originalCurrency}
-                             </span>
-                        </div>
-
-                        <div className="flex items-center bg-gray-100 rounded-full p-1 shadow-inner">
-                            <button 
-                                onClick={() => onUpdateCart(item.id, -1)}
-                                className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${quantity > 0 ? 'bg-white text-sausage-700 shadow-sm hover:bg-red-50 hover:text-red-500' : 'text-gray-300'}`}
-                                disabled={quantity === 0}
-                            >
-                                <Minus size={18} />
-                            </button>
-                            <span className={`w-8 text-center font-bold ${quantity > 0 ? 'text-sausage-900' : 'text-gray-300'}`}>
-                                {quantity}
-                            </span>
-                            <button 
-                                onClick={() => onUpdateCart(item.id, 1)}
-                                className="w-10 h-10 flex items-center justify-center rounded-full bg-sausage-600 text-white shadow-md hover:bg-sausage-700 active:scale-95 transition-transform"
-                            >
-                                <Plus size={18} />
-                            </button>
-                        </div>
-                    </div>
-
-                  </motion.div>
-                );
-              })}
+            <div className="flex flex-col items-center justify-center gap-3 border-l pl-4 border-slate-100">
+              <button 
+                onClick={() => onUpdateCart(item.id, 1)}
+                className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              >
+                +
+              </button>
+              <span className="font-bold text-slate-800 w-6 text-center">
+                {cart[item.id]?.quantity || 0}
+              </span>
+              <button 
+                onClick={() => onUpdateCart(item.id, -1)}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  (cart[item.id]?.quantity || 0) > 0 
+                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
+                    : 'bg-slate-50 text-slate-300'
+                }`}
+              >
+                -
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Floating Bottom Bar */}
-      <AnimatePresence>
-        {totalItems > 0 && (
-            <motion.div 
-                initial={{ y: 100 }}
-                animate={{ y: 0 }}
-                exit={{ y: 100 }}
-                className="fixed bottom-0 left-0 right-0 bg-white border-t border-sausage-100 shadow-[0_-5px_20px_-5px_rgba(0,0,0,0.1)] p-4 z-40 pb-6 safe-area-bottom"
-            >
-                <div className="max-w-md mx-auto flex items-center justify-between gap-4">
-                    <div className="flex flex-col">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Estimated Total</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-sausage-900">{totalConverted.toFixed(0)}</span>
-                            <span className="text-sm font-bold text-sausage-600">{menuData.targetCurrency}</span>
-                        </div>
-                    </div>
-                    
-                    <button 
-                        onClick={onViewSummary}
-                        className="flex-1 bg-sausage-900 text-white py-3.5 px-6 rounded-xl font-bold text-lg shadow-lg hover:bg-sausage-800 active:scale-95 transition-all flex items-center justify-center gap-2"
-                    >
-                        Checkout <span className="bg-sausage-700 px-2 py-0.5 rounded text-sm">{totalItems}</span>
-                    </button>
-                </div>
-            </motion.div>
-        )}
-      </AnimatePresence>
+      {totalItems > 0 && (
+        <div className="absolute bottom-6 left-6 right-6">
+          <button 
+            onClick={onViewSummary}
+            className="w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex justify-between items-center active:scale-95 transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-orange-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+                {totalItems}
+              </div>
+              <span className="font-medium text-slate-200">
+                預估 NT$ {Math.round(totalPrice * menuData.exchangeRate)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 font-bold">
+              去結帳 <ShoppingCart size={20} />
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
