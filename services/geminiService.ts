@@ -58,7 +58,7 @@ export const parseMenuImage = async (
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash"
+      model: "gemini-2.5-flash"
     });
     
     // 正確的參數格式:陣列形式
@@ -122,7 +122,7 @@ export const explainDish = async (
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash"
+    model: "gemini-2.5-flash"
   });
   
   const prompt = `Explain the dish "${dishName}" (originally in ${originalLang}) in ${targetLang}. Provide a brief, one-sentence explanation focusing on the main ingredients and cooking method.`;
