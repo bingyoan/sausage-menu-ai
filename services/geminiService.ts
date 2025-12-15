@@ -1,26 +1,26 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, Type } from "@google/generative-ai"; /* ⚡️ 修正點四：SchemaType 改為 Type */
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
 const menuSchema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT, /* ⚡️ 修正點五：使用 Type.OBJECT */
   properties: {
-    originalCurrency: { type: SchemaType.STRING },
-    exchangeRate: { type: SchemaType.NUMBER },
-    detectedLanguage: { type: SchemaType.STRING },
+    originalCurrency: { type: Type.STRING },
+    exchangeRate: { type: Type.NUMBER },
+    detectedLanguage: { type: Type.STRING },
     items: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          originalName: { type: SchemaType.STRING },
-          translatedName: { type: SchemaType.STRING },
-          price: { type: SchemaType.NUMBER },
-          category: { type: SchemaType.STRING },
-          allergy_warning: { type: SchemaType.BOOLEAN },
-          dietary_tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          description: { type: SchemaType.STRING }
+          originalName: { type: Type.STRING },
+          translatedName: { type: Type.STRING },
+          price: { type: Type.NUMBER },
+          category: { type: Type.STRING },
+          allergy_warning: { type: Type.BOOLEAN },
+          dietary_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          description: { type: Type.STRING }
         },
         required: ["originalName", "translatedName", "price", "allergy_warning"],
       },
@@ -37,11 +37,11 @@ export const parseMenuImage = async (
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
   const genAI = new GoogleGenerativeAI(cleanApiKey);
   
-  // ⚡️ 使用最新 Gemini 2.5 Flash Lite
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash-lite", 
-    generationConfig: {
-      responseMimeType: "application/json",
+    /* ⚡️ 修正點六：舊版套件使用 responseSchema 而非 responseMimeType */
+    config: { 
+      responseMimeType: "application/json", 
       responseSchema: menuSchema,
     },
   });
@@ -61,7 +61,9 @@ export const parseMenuImage = async (
   }));
 
   try {
-    const result = await model.generateContent([prompt, ...imageParts]);
+    const result = await model.generateContent({
+      contents: [prompt, ...imageParts],
+    });
     const response = await result.response;
     const text = response.text();
     if (!text) throw new Error("No response");
@@ -101,11 +103,12 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  // ⚡️ 使用最新 Gemini 2.5 Flash Lite
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
   const prompt = `Explain "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
   try {
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [prompt],
+    });
     return (await result.response).text();
   } catch (error) {
     return "No explanation.";
