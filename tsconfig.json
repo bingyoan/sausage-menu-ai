@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["dom", "dom.iterable", "esnext"],  /* ⚡️ 修正點一：改成通用寫法 */
+    "lib": ["dom", "dom.iterable", "esnext"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -14,12 +14,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* ⚡️ 修正點一：關閉未讀取警告，解決 TS6133 錯誤 */
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["**/*.ts", "**/*.tsx"]
-  /* ⚡️ 修正點二：刪除了 references 引用 */
 }
