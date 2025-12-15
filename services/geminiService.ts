@@ -18,7 +18,6 @@ const menuSchema = {
           translatedName: { type: SchemaType.STRING },
           price: { type: SchemaType.NUMBER, description: "Numeric price value only. Use tax-inclusive price if available." },
           category: { type: SchemaType.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
-          // ✨ 保留新功能：過敏原與飲食標籤
           allergy_warning: { type: SchemaType.BOOLEAN, description: "True if the dish contains common allergens (nuts, dairy, seafood, beef, pork)." },
           dietary_tags: { 
             type: SchemaType.ARRAY, 
@@ -43,12 +42,14 @@ export const parseMenuImage = async (
   // 1. 清洗 Key
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
 
-  // 2. 初始化 SDK (這裡改回了 @google/generative-ai，解決報錯！)
+  // 2. 初始化 SDK
   const genAI = new GoogleGenerativeAI(cleanApiKey);
   
-  // 3. 指定模型 (使用最穩定的 1.5 Flash)
+  // 3. 指定模型：改用 "gemini-2.5-flash-lite"
+  // 1.5 Flash 已於 2025/9 退役，2.5 Flash 額度太少(20次)。
+  // 2.5 Flash-Lite 是 Google 官方推薦的高流量替代品。
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash", 
+    model: "gemini-2.5-flash-lite", 
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: menuSchema,
@@ -107,6 +108,14 @@ export const parseMenuImage = async (
 
   } catch (error) {
     console.error("Gemini Parse Error:", error);
+    // 錯誤處理：如果連 Lite 都 404，提示用戶檢查 Key 權限
+    const errStr = String(error);
+    if (errStr.includes("404")) {
+       throw new Error("找不到模型，請確認您的 API Key 是否支援 Gemini 2.5 Flash-Lite");
+    }
+    if (errStr.includes("429")) {
+       throw new Error("使用額度已滿，請稍後再試。");
+    }
     throw new Error(`AI 連線失敗: ${error}`);
   }
 };
@@ -119,7 +128,8 @@ export const explainDish = async (
 ): Promise<string> => {
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
   const genAI = new GoogleGenerativeAI(cleanApiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  // 解說部分也改用 Lite
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const prompt = `Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
 
