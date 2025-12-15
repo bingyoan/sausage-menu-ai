@@ -1,29 +1,28 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI, Type } from "@google/generative-ai"; // ⚡️ 修正點一：在新版中，定義 JSON 結構使用 Type
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
-// ⚡️ 修正點一：將模型名稱定義為 gemini-2.5-flash
-const MODEL_NAME = "gemini-2.5-flash"; 
+const MODEL_NAME = "gemini-2.5-flash"; // ⚡️ 修正點二：使用您指定的高效能模型
 
 const menuSchema = {
-  type: SchemaType.OBJECT, 
+  type: Type.OBJECT, // ⚡️ 修正點三：使用 Type.OBJECT (新寫法)
   properties: {
-    originalCurrency: { type: SchemaType.STRING },
-    exchangeRate: { type: SchemaType.NUMBER },
-    detectedLanguage: { type: SchemaType.STRING },
+    originalCurrency: { type: Type.STRING },
+    exchangeRate: { type: Type.NUMBER },
+    detectedLanguage: { type: Type.STRING },
     items: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          originalName: { type: SchemaType.STRING },
-          translatedName: { type: SchemaType.STRING },
-          price: { type: SchemaType.NUMBER },
-          category: { type: SchemaType.STRING },
-          allergy_warning: { type: SchemaType.BOOLEAN },
-          dietary_tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          description: { type: SchemaType.STRING }
+          originalName: { type: Type.STRING },
+          translatedName: { type: Type.STRING },
+          price: { type: Type.NUMBER },
+          category: { type: Type.STRING },
+          allergy_warning: { type: Type.BOOLEAN },
+          dietary_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+          description: { type: Type.STRING }
         },
         required: ["originalName", "translatedName", "price", "allergy_warning"],
       },
@@ -56,20 +55,25 @@ export const parseMenuImage = async (
 
   try {
     const model = genAI.getGenerativeModel({
-      model: MODEL_NAME, // 使用新定義的模型名稱
+      model: MODEL_NAME, 
+      // ⚡️ 修正點四：在新版中，使用 generationConfig 物件包裹 responseSchema
       config: { 
         responseSchema: menuSchema,
+        responseMimeType: "application/json", // 新版中這樣指定更嚴格的 JSON 輸出
       },
     });
     
-    const result = await model.generateContent([prompt, ...imageParts]); 
-    const response = await result.response;
+    const result = await model.generateContent({
+      contents: [prompt, ...imageParts] // 新版中，generateContent 參數必須是 { contents: [...] }
+    });
+    
+    const response = result.response;
     const text = response.text();
     if (!text) throw new Error("No response");
 
-    const textToParse = text.startsWith('```json') ? text.substring(7, text.length - 3).trim() : text.trim();
+    // 由於我們使用了 responseMimeType，AI 輸出應該是純 JSON
+    const parsed = JSON.parse(text); 
     
-    const parsed = JSON.parse(textToParse);
     const detectedCurrency = parsed.originalCurrency || 'JPY';
     const realExchangeRate = await fetchExchangeRate(detectedCurrency, targetCurrency);
     const finalExchangeRate = realExchangeRate || parsed.exchangeRate || 0.22;
@@ -93,8 +97,6 @@ export const parseMenuImage = async (
 
   } catch (error) {
     console.error("Gemini Error:", error);
-    // 輸出錯誤信息幫助除錯
-    console.error(error); 
     alert("菜單解析失敗。請確認您的 API Key，並確保菜單圖片清晰。");
     throw error;
   }
@@ -107,11 +109,11 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME }); // 使用新定義的模型名稱
+  const model = genAI.getGenerativeModel({ model: MODEL_NAME }); 
   const prompt = `Explain "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
   try {
-    const result = await model.generateContent(prompt); 
-    return (await result.response).text();
+    const result = await model.generateContent({ contents: [prompt] }); // 新版寫法
+    return result.response.text();
   } catch (error) {
     return "No explanation.";
   }
