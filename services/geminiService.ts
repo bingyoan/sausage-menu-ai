@@ -1,35 +1,7 @@
-import { GoogleGenerativeAI, Type } from "@google/generative-ai"; // ⚡️ 修正點一：在新版中，定義 JSON 結構使用 Type
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
-
-const MODEL_NAME = "gemini-2.5-flash"; // ⚡️ 修正點二：使用您指定的高效能模型
-
-const menuSchema = {
-  type: Type.OBJECT, // ⚡️ 修正點三：使用 Type.OBJECT (新寫法)
-  properties: {
-    originalCurrency: { type: Type.STRING },
-    exchangeRate: { type: Type.NUMBER },
-    detectedLanguage: { type: Type.STRING },
-    items: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          originalName: { type: Type.STRING },
-          translatedName: { type: Type.STRING },
-          price: { type: Type.NUMBER },
-          category: { type: Type.STRING },
-          allergy_warning: { type: Type.BOOLEAN },
-          dietary_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          description: { type: Type.STRING }
-        },
-        required: ["originalName", "translatedName", "price", "allergy_warning"],
-      },
-    },
-  },
-  required: ["items", "originalCurrency", "exchangeRate", "detectedLanguage"],
-};
 
 export const parseMenuImage = async (
   apiKey: string,
@@ -42,42 +14,84 @@ export const parseMenuImage = async (
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   const prompt = `
-    Analyze ${base64Images.length} menu image(s).
-    Extract items, translate to ${targetLanguage}.
-    Detect Currency & Exchange Rate to ${targetCurrency}.
-    Price: use TAX-INCLUSIVE.
-    Return SINGLE JSON.
+    You are a menu parser. Analyze ${base64Images.length} menu image(s) and extract ALL menu items.
+    
+    For each item, provide:
+    - originalName: exact name from menu
+    - translatedName: translation to ${targetLanguage}
+    - price: numeric value (tax-inclusive)
+    - category: food category
+    - allergy_warning: true if contains common allergens
+    - dietary_tags: array of tags like ["vegetarian", "spicy", etc]
+    - description: brief description
+    
+    Also detect:
+    - originalCurrency: currency code (e.g., JPY, USD, EUR)
+    - exchangeRate: estimated rate to ${targetCurrency}
+    - detectedLanguage: language of the menu
+    
+    Return ONLY valid JSON in this exact format:
+    {
+      "originalCurrency": "JPY",
+      "exchangeRate": 0.22,
+      "detectedLanguage": "Japanese",
+      "items": [
+        {
+          "originalName": "寿司",
+          "translatedName": "Sushi",
+          "price": 1200,
+          "category": "Seafood",
+          "allergy_warning": true,
+          "dietary_tags": ["seafood"],
+          "description": "Fresh raw fish"
+        }
+      ]
+    }
   `;
 
   const imageParts = base64Images.map(img => ({
-    inlineData: { data: img, mimeType: "image/jpeg" }
+    inlineData: { 
+      data: img, 
+      mimeType: "image/jpeg" 
+    }
   }));
 
   try {
     const model = genAI.getGenerativeModel({
-      model: MODEL_NAME, 
-      // ⚡️ 修正點四：在新版中，使用 generationConfig 物件包裹 responseSchema
-      config: { 
-        responseSchema: menuSchema,
-        responseMimeType: "application/json", // 新版中這樣指定更嚴格的 JSON 輸出
-      },
+      model: "gemini-1.5-flash"
     });
     
-    const result = await model.generateContent({
-      contents: [prompt, ...imageParts] // 新版中，generateContent 參數必須是 { contents: [...] }
-    });
-    
+    // 正確的參數格式:陣列形式
+    const result = await model.generateContent([prompt, ...imageParts]); 
     const response = result.response;
     const text = response.text();
-    if (!text) throw new Error("No response");
-
-    // 由於我們使用了 responseMimeType，AI 輸出應該是純 JSON
-    const parsed = JSON.parse(text); 
+    
+    if (!text) throw new Error("No response from Gemini API");
+    
+    // 清理可能的 markdown 標記
+    let textToParse = text.trim();
+    if (textToParse.startsWith('```json')) {
+      textToParse = textToParse.substring(7);
+    }
+    if (textToParse.startsWith('```')) {
+      textToParse = textToParse.substring(3);
+    }
+    if (textToParse.endsWith('```')) {
+      textToParse = textToParse.substring(0, textToParse.length - 3);
+    }
+    textToParse = textToParse.trim();
+    
+    const parsed = JSON.parse(textToParse);
+    
+    // 驗證必要欄位
+    if (!parsed.items || !Array.isArray(parsed.items)) {
+      throw new Error("Invalid response format: missing items array");
+    }
     
     const detectedCurrency = parsed.originalCurrency || 'JPY';
     const realExchangeRate = await fetchExchangeRate(detectedCurrency, targetCurrency);
     const finalExchangeRate = realExchangeRate || parsed.exchangeRate || 0.22;
-
+    
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
@@ -94,10 +108,8 @@ export const parseMenuImage = async (
       exchangeRate: finalExchangeRate,
       detectedLanguage: parsed.detectedLanguage || 'Unknown'
     };
-
   } catch (error) {
     console.error("Gemini Error:", error);
-    alert("菜單解析失敗。請確認您的 API Key，並確保菜單圖片清晰。");
     throw error;
   }
 };
@@ -109,12 +121,18 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME }); 
-  const prompt = `Explain "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash"
+  });
+  
+  const prompt = `Explain the dish "${dishName}" (originally in ${originalLang}) in ${targetLang}. Provide a brief, one-sentence explanation focusing on the main ingredients and cooking method.`;
+  
   try {
-    const result = await model.generateContent({ contents: [prompt] }); // 新版寫法
-    return result.response.text();
+    const result = await model.generateContent(prompt); 
+    const response = result.response;
+    return response.text();
   } catch (error) {
-    return "No explanation.";
+    console.error("Explain dish error:", error);
+    return "No explanation available.";
   }
 };
