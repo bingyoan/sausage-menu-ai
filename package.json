@@ -12,12 +12,12 @@
   "dependencies": {
     "@google/generative-ai": "^0.1.0",
     "framer-motion": "^10.16.4",
-    "html2canvas": "^1.4.1",    <-- ⚡️ 這裡必須有逗號，因為後面還有一個屬性
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.284.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hot-toast": "^2.4.1"  
-  },                           <-- ⚠️ 這是 dependencies 列表的結尾，這裡不能有逗號
+    "react-hot-toast": "^2.4.1"
+  },
   "devDependencies": {
     "@types/node": "^20.11.20",
     "@types/react": "^18.2.25",
