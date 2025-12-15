@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { MenuData, Cart, TargetLanguage } from '../types';
-import { ShoppingCart, ArrowLeft, AlertTriangle, Info } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ArrowLeft, ShoppingBag, Receipt, Coins, HelpCircle, Minus, Plus, Loader2 } from 'lucide-react';
+import { MenuItem, MenuData, Cart, TargetLanguage, CartItem } from '../types';
 import { explainDish } from '../services/geminiService';
-import toast from 'react-hot-toast';
+import { BoneIcon } from './DachshundAssets';
 
 interface OrderingPageProps {
   apiKey: string;
@@ -21,134 +21,163 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
   targetLang,
   onUpdateCart,
   onViewSummary,
-  onBack
+  onBack,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [explainingId, setExplainingId] = useState<string | null>(null);
+  const [showConvertedPrice, setShowConvertedPrice] = useState(true);
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [loadingExplanation, setLoadingExplanation] = useState<string | null>(null);
 
-  if (!menuData || !menuData.items) {
-      return <div>Loading...</div>;
-  }
+  const handleExplain = async (item: MenuItem) => {
+    if (explanations[item.id]) return;
 
-  const categories = ['All', ...Array.from(new Set(menuData.items.map(i => i.category)))];
-  
-  const displayedItems = selectedCategory === 'All' 
-    ? menuData.items 
-    : menuData.items.filter(i => i.category === selectedCategory);
-
-  const totalItems = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = Object.values(cart).reduce((sum, item) => sum + (item.item.price * item.quantity), 0);
-
-  const handleExplain = async (item: any) => {
-    setExplainingId(item.id);
-    try {
-      const explanation = await explainDish(apiKey, item.originalName, menuData.detectedLanguage, targetLang);
-      toast(explanation, { icon: '🧑‍🍳', duration: 4000 });
-    } catch (e) {
-      toast.error("無法取得解說");
-    } finally {
-      setExplainingId(null);
-    }
+    setLoadingExplanation(item.id);
+    const text = await explainDish(apiKey, item.originalName, menuData.detectedLanguage, targetLang);
+    setExplanations(prev => ({ ...prev, [item.id]: text }));
+    setLoadingExplanation(null);
   };
 
+  const cartValues = Object.values(cart) as CartItem[];
+
+  const totalPrice = cartValues.reduce((sum, cartItem) => {
+    return sum + (cartItem.item.price * cartItem.quantity);
+  }, 0);
+
+  const totalConverted = totalPrice * menuData.exchangeRate;
+  const totalItems = cartValues.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Group items by category
+  const groupedItems = useMemo<Record<string, MenuItem[]>>(() => {
+    const groups: Record<string, MenuItem[]> = {};
+    menuData.items.forEach(item => {
+      const cat = item.category || 'Others';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(item);
+    });
+    return groups;
+  }, [menuData.items]);
+
   return (
-    <div className="h-full flex flex-col bg-slate-50">
-      <div className="bg-white p-4 shadow-sm flex items-center justify-between z-10 sticky top-0">
-        <button onClick={onBack} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-20">
+        <button onClick={onBack} className="p-2 text-sausage-800 hover:bg-sausage-50 rounded-full">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-bold text-lg text-slate-800">點餐中</h2>
-        <div className="w-10"></div>
+        <div className="flex flex-col items-center">
+            <h2 className="font-bold text-sausage-900 text-lg">Menu</h2>
+            <span className="text-xs text-sausage-600 bg-sausage-100 px-2 py-0.5 rounded-full">
+                {menuData.items.length} items found
+            </span>
+        </div>
+        
+        <button 
+            onClick={() => setShowConvertedPrice(!showConvertedPrice)}
+            className="flex items-center gap-1 text-xs font-bold bg-sausage-100 text-sausage-800 px-3 py-1.5 rounded-full border border-sausage-200"
+        >
+            <Coins size={14} />
+            {showConvertedPrice ? menuData.targetCurrency : menuData.originalCurrency}
+        </button>
       </div>
 
-      <div className="overflow-x-auto p-4 flex gap-2 no-scrollbar bg-white border-b border-slate-100">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              selectedCategory === cat 
-                ? 'bg-slate-800 text-white' 
-                : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
+        {Object.entries(groupedItems).map(([category, items]: [string, MenuItem[]]) => (
+          <div key={category}>
+            <h3 className="text-xl font-black text-sausage-800 mb-3 px-1 sticky top-0">{category}</h3>
+            <div className="space-y-4">
+              {items.map((item) => {
+                const cartItem = cart[item.id] as CartItem | undefined;
+                const quantity = cartItem?.quantity || 0;
+                const priceDisplay = showConvertedPrice 
+                  ? `≈ ${(item.price * menuData.exchangeRate).toFixed(0)} ${menuData.targetCurrency}`
+                  : `${item.price} ${menuData.originalCurrency}`;
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
-        {displayedItems.map(item => (
-          <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4">
-            <div className="flex-1 space-y-2">
-              <div className="flex justify-between items-start">
-                <h3 className="font-bold text-slate-800">{item.translatedName}</h3>
-                <span className="font-medium text-orange-600">
-                  NT$ {Math.round(item.price * menuData.exchangeRate)}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">{item.originalName}</p>
-              <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
-                {item.description}
-              </p>
-              
-              <div className="flex flex-wrap gap-2 mt-2">
-                {item.allergy_warning && (
-                  <span className="px-2 py-1 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1 font-medium">
-                    <AlertTriangle size={12} /> 過敏注意
-                  </span>
-                )}
-                <button 
-                  onClick={() => handleExplain(item)}
-                  disabled={explainingId === item.id}
-                  className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg flex items-center gap-1 font-medium hover:bg-blue-100"
-                >
-                  <Info size={12} /> {explainingId === item.id ? '解說中...' : 'AI 食評'}
-                </button>
-              </div>
-            </div>
+                return (
+                  <div key={item.id} className="bg-white rounded-2xl shadow-sm p-4 border border-sausage-100 relative overflow-hidden">
+                    {/* Decorative Bone Background */}
+                    <BoneIcon className="absolute -right-4 -bottom-4 w-20 h-20 text-sausage-50 opacity-50 rotate-12 pointer-events-none"/>
 
-            <div className="flex flex-col items-center justify-center gap-3 border-l pl-4 border-slate-100">
-              <button 
-                onClick={() => onUpdateCart(item.id, 1)}
-                className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
-              >
-                +
-              </button>
-              <span className="font-bold text-slate-800 w-6 text-center">
-                {cart[item.id]?.quantity || 0}
-              </span>
-              <button 
-                onClick={() => onUpdateCart(item.id, -1)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                  (cart[item.id]?.quantity || 0) > 0 
-                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' 
-                    : 'bg-slate-50 text-slate-300'
-                }`}
-              >
-                -
-              </button>
+                    <div className="flex justify-between items-start mb-2 relative z-10">
+                      <div className="flex-1 pr-2">
+                        <h3 className="font-bold text-gray-900 text-lg leading-tight">{item.originalName}</h3>
+                        <p className="text-sausage-700 font-medium text-sm mt-1">{item.translatedName}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="block font-bold text-sausage-800 bg-sausage-100 px-2 py-1 rounded-lg text-sm whitespace-nowrap">
+                          {priceDisplay}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* AI Explanation Section */}
+                    <div className="mb-3 relative z-10">
+                      {explanations[item.id] ? (
+                        <div className="bg-blue-50 text-blue-800 text-xs p-2 rounded-lg mt-2 border border-blue-100 animate-fadeIn">
+                          <span className="font-bold">🐶 AI says:</span> {explanations[item.id]}
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => handleExplain(item)}
+                          disabled={loadingExplanation === item.id}
+                          className="text-xs text-sausage-500 flex items-center gap-1 mt-1 hover:text-sausage-700 transition-colors"
+                        >
+                          {loadingExplanation === item.id ? <Loader2 size={12} className="animate-spin"/> : <HelpCircle size={12} />}
+                          What is this?
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center justify-end gap-3 mt-3 relative z-10">
+                      {quantity > 0 && (
+                          <>
+                              <button 
+                                  onClick={() => onUpdateCart(item.id, -1)}
+                                  className="w-8 h-8 flex items-center justify-center rounded-full bg-sausage-100 text-sausage-700 hover:bg-sausage-200 active:bg-sausage-300 transition-colors"
+                              >
+                                  <Minus size={16} />
+                              </button>
+                              <span className="font-bold text-lg w-6 text-center">{quantity}</span>
+                          </>
+                      )}
+                      <button 
+                          onClick={() => onUpdateCart(item.id, 1)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${quantity > 0 ? 'bg-sausage-100 text-sausage-700' : 'bg-sausage-500 text-white shadow-md'}`}
+                      >
+                          <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
 
+      {/* Floating Action Bar */}
       {totalItems > 0 && (
-        <div className="absolute bottom-6 left-6 right-6">
+        <div className="absolute bottom-6 left-4 right-4 z-30">
           <button 
             onClick={onViewSummary}
-            className="w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex justify-between items-center active:scale-95 transition-transform"
+            className="w-full bg-sausage-900 text-white p-4 rounded-2xl shadow-xl flex items-center justify-between hover:bg-sausage-800 transition-transform active:scale-95 border-2 border-sausage-700"
           >
             <div className="flex items-center gap-3">
-              <div className="bg-orange-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+              <div className="bg-sausage-600 w-10 h-10 rounded-full flex items-center justify-center font-bold">
                 {totalItems}
               </div>
-              <span className="font-medium text-slate-200">
-                預估 NT$ {Math.round(totalPrice * menuData.exchangeRate)}
-              </span>
+              <div className="flex flex-col items-start">
+                <span className="text-xs text-sausage-200 uppercase font-bold tracking-wider">Total Est.</span>
+                <span className="font-bold text-lg">
+                    {showConvertedPrice 
+                        ? `≈ ${totalConverted.toFixed(0)} ${menuData.targetCurrency}`
+                        : `${totalPrice.toFixed(0)} ${menuData.originalCurrency}`
+                    }
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 font-bold">
-              去結帳 <ShoppingCart size={20} />
+            <div className="flex items-center gap-2 font-bold text-lg">
+              View List <Receipt size={20} />
             </div>
           </button>
         </div>
