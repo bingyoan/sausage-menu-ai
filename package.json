@@ -20,7 +20,7 @@
   "devDependencies": {
     "@types/react": "^18.2.25",
     "@types/react-dom": "^18.2.11",
-    "@types/node": "^20.11.20",  <-- ⚡️ **新加入的修正點** ⚡️
+    "@types/node": "^20.11.20",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitejs/plugin-react": "^4.0.3",
