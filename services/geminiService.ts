@@ -1,25 +1,32 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // <--- 關鍵在這裡！改成這個才對
-import { MenuData, TargetLanguage } from '../types';
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { MenuItem, MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 
-// 定義回傳格式 (Schema)
-const menuSchema = {
-  type: SchemaType.OBJECT,
+// Schema for the menu parsing response
+const menuSchema: Schema = {
+  type: Type.OBJECT,
   properties: {
-    originalCurrency: { type: SchemaType.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
-    exchangeRate: { type: SchemaType.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
-    detectedLanguage: { type: SchemaType.STRING, description: "The primary language detected on the menu." },
+    originalCurrency: { type: Type.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
+    exchangeRate: { type: Type.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
+    detectedLanguage: { type: Type.STRING, description: "The primary language detected on the menu." },
     items: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          originalName: { type: SchemaType.STRING },
-          translatedName: { type: SchemaType.STRING },
-          price: { type: SchemaType.NUMBER, description: "Numeric price value only. Use tax-inclusive price if available." },
-          category: { type: SchemaType.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
+          originalName: { type: Type.STRING },
+          translatedName: { type: Type.STRING },
+          price: { type: Type.NUMBER, description: "Numeric price value only. If the menu lists tax-inclusive prices, use that." },
+          category: { type: Type.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
+          shortDescription: { type: Type.STRING, description: "Very brief (5-8 words) description of what the dish is/ingredients." },
+          allergy_warning: { type: Type.BOOLEAN, description: "True if the dish likely contains common allergens (Nuts, Seafood, Dairy, Eggs, Gluten)." },
+          dietary_tags: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING },
+            description: "Tags like 'Spicy', 'Vegan', 'Vegetarian', 'Gluten-Free', 'Contains Nuts', 'Seafood'." 
+          }
         },
-        required: ["originalName", "translatedName", "price"],
+        required: ["originalName", "translatedName", "price", "category"],
       },
     },
   },
@@ -28,56 +35,54 @@ const menuSchema = {
 
 export const parseMenuImage = async (
   apiKey: string,
-  base64Images: string[], 
+  base64Images: string[], // Changed to accept array
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // 1. 強力清洗 Key (移除所有看不到的怪異符號)
-  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
-
-  // 🕵️‍♂️ Debug: 印出 Key 的前幾碼
-  console.log("正在使用 API Key:", cleanApiKey.substring(0, 8) + "******");
-
-  // 2. 初始化 SDK (使用 @google/generative-ai)
-  const genAI = new GoogleGenerativeAI(cleanApiKey);
-  
-  // 3. 指定使用 "gemini-2.5-flash" (最穩定版本)
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash", 
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: menuSchema,
-    },
-    systemInstruction: "You are a fast OCR and translation engine. Extract menu items from the images. Merge duplicates. Group by category. Translate names. Return JSON immediately."
-  });
-
+  // Initialize AI with the user's key
+  const ai = new GoogleGenAI({ apiKey: apiKey });
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   const prompt = `
-    TASK: Analyze ${base64Images.length} menu image(s).
-    1. Extract items (Food/Drink).
-    2. Translate to ${targetLanguage}.
-    3. Detect Currency & Exchange Rate to ${targetCurrency}.
-    4. Price: use TAX-INCLUSIVE if available.
-    5. Return SINGLE JSON.
+    Analyze ${base64Images.length} menu image(s).
+    Extract all items, merge duplicates, group by category.
+    Translate to ${targetLanguage}.
+    Detect currency and provide rate to ${targetCurrency}.
+    Use tax-inclusive prices.
+    
+    CRITICAL INSTRUCTION: Analyze dish names for potential allergens (Nuts, Seafood, Dairy, Pork, Beef). 
+    If a dish is likely to trigger common allergies, set 'allergy_warning' to true and add relevant 'dietary_tags'.
+    Provide a 'shortDescription' for every item explaining what it is briefly.
+    
+    Return JSON.
   `;
 
-  const imageParts = base64Images.map(img => ({
-    inlineData: {
-      data: img,
-      mimeType: "image/jpeg"
-    }
-  }));
+  // Prepare parts: text prompt + all images
+  const parts: any[] = [{ text: prompt }];
+  base64Images.forEach(img => {
+      parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
+  });
 
   try {
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    const text = response.text();
+    // Using gemini-2.5-flash for stability
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: parts
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: menuSchema,
+        systemInstruction: "You are a professional menu translator and nutritionist. Extract items accurately and identify dietary concerns."
+      }
+    });
 
+    const text = response.text;
     if (!text) throw new Error("No response from AI");
 
     const parsed = JSON.parse(text);
 
+    // Add unique IDs to items
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
@@ -94,7 +99,7 @@ export const parseMenuImage = async (
 
   } catch (error) {
     console.error("Gemini Parse Error:", error);
-    throw new Error(`AI 連線失敗: ${error}`);
+    throw error;
   }
 };
 
@@ -105,19 +110,26 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   
-  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
-  const genAI = new GoogleGenerativeAI(cleanApiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  // Initialize AI with the user's key
+  const ai = new GoogleGenAI({ apiKey: apiKey });
 
   const prompt = `
-    Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 
-    1 short sentence. Fun & appetizing.
+    Explain the dish "${dishName}" (which is in ${originalLang}).
+    Translate the concept and ingredients briefly into ${targetLang}.
+    Keep it short (1 sentence), fun, and appetizing.
+    Don't just repeat the translation, explain WHAT it is.
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text() || "No explanation available.";
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'text/plain',
+      }
+    });
+
+    return response.text || "No explanation available.";
   } catch (error) {
     console.error("Gemini Explain Error:", error);
     return "Could not load explanation.";

@@ -15,7 +15,10 @@ export interface MenuItem {
   translatedName: string;
   price: number;
   category?: string;
-  explanation?: string; // Loaded lazily
+  explanation?: string; // Deep explanation (lazy loaded)
+  shortDescription?: string; // Brief description from initial parse
+  allergy_warning?: boolean;
+  dietary_tags?: string[];
 }
 
 export interface MenuData {

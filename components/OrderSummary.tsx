@@ -1,7 +1,9 @@
-import React from 'react';
-import { X, CheckCircle, Home } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Home, Share2, Users, Download } from 'lucide-react';
 import { Cart, MenuData, CartItem } from '../types';
 import { SausageDogLogo } from './DachshundAssets';
+import html2canvas from 'html2canvas';
+import toast from 'react-hot-toast';
 
 interface OrderSummaryProps {
   cart: Cart;
@@ -11,66 +13,149 @@ interface OrderSummaryProps {
 }
 
 export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onClose, onFinish }) => {
+  const [personCount, setPersonCount] = useState(1);
   const cartItems = Object.values(cart) as CartItem[];
+  
   const totalPrice = cartItems.reduce((sum, i) => sum + (i.item.price * i.quantity), 0);
+  const totalConverted = totalPrice * menuData.exchangeRate;
+
+  const handleShare = async () => {
+      const element = document.getElementById('receipt-view');
+      if (!element) return;
+      
+      const toastId = toast.loading('Generating receipt...');
+      try {
+          // Temporarily remove rounded corners and shadow for cleaner capture
+          element.style.borderRadius = '0';
+          const canvas = await html2canvas(element, { 
+              scale: 2,
+              backgroundColor: '#fff7ed', // sausage-50
+          });
+          element.style.borderRadius = '1.5rem'; // Restore
+
+          const image = canvas.toDataURL('image/png');
+          
+          // Create download link
+          const link = document.createElement('a');
+          link.href = image;
+          link.download = `SausageMenu_${Date.now()}.png`;
+          link.click();
+          
+          toast.success('Receipt saved!', { id: toastId });
+      } catch (err) {
+          console.error(err);
+          toast.error('Could not generate image', { id: toastId });
+      }
+  };
 
   return (
     <div className="fixed inset-0 bg-sausage-900 z-50 flex flex-col">
-      <div className="bg-white rounded-b-3xl flex-1 flex flex-col overflow-hidden m-2 mb-0">
+      <div className="bg-gray-100 flex-1 flex flex-col overflow-hidden m-2 mb-0 rounded-t-3xl">
         
         {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-sausage-50">
-          <div className="flex items-center gap-2">
-            <SausageDogLogo className="w-8 h-8 text-sausage-600" />
-            <h2 className="text-xl font-black text-sausage-900 uppercase tracking-tight">Order List</h2>
-          </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-full text-gray-500 hover:text-gray-900 shadow-sm">
-            <X size={24} />
+        <div className="p-4 bg-white flex justify-between items-center shadow-sm z-10">
+          <h2 className="text-xl font-black text-sausage-900">Your Order</h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Content - Optimized for legibility */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-xl text-center text-sm font-medium mb-4">
-            Show this screen to the staff to order! 🐶
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          
+          {/* RECEIPT CARD - Target for html2canvas */}
+          <div id="receipt-view" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 relative overflow-hidden mb-6">
+             {/* Receipt Sawtooth Top */}
+             <div className="absolute top-0 left-0 right-0 h-2 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:16px_16px] rotate-180 -mt-1"></div>
+
+             <div className="flex flex-col items-center mb-6 border-b-2 border-dashed border-gray-200 pb-4">
+                <SausageDogLogo className="w-16 h-10 text-sausage-600 mb-2" />
+                <h3 className="font-black text-gray-900 text-lg uppercase tracking-widest">Receipt</h3>
+                <p className="text-gray-400 text-xs">{new Date().toLocaleString()}</p>
+             </div>
+
+             <div className="space-y-4 mb-6">
+                {cartItems.map(({ item, quantity }) => (
+                    <div key={item.id} className="flex justify-between items-start text-sm">
+                        <div className="flex gap-3">
+                            <span className="font-bold text-sausage-600">x{quantity}</span>
+                            <div>
+                                <p className="font-bold text-gray-800 leading-tight">{item.translatedName}</p>
+                                <p className="text-xs text-gray-400">{item.originalName}</p>
+                            </div>
+                        </div>
+                        <span className="font-mono text-gray-600 font-bold whitespace-nowrap">
+                            {(item.price * quantity).toFixed(0)}
+                        </span>
+                    </div>
+                ))}
+             </div>
+
+             <div className="border-t-2 border-black pt-4">
+                 <div className="flex justify-between items-end mb-1">
+                     <span className="font-bold text-gray-500 uppercase text-xs">Total ({menuData.originalCurrency})</span>
+                     <span className="font-black text-2xl text-gray-900">{totalPrice}</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                     <span className="font-bold text-gray-400 uppercase text-xs">Est. ({menuData.targetCurrency})</span>
+                     <span className="font-bold text-sausage-600">≈ {totalConverted.toFixed(0)}</span>
+                 </div>
+             </div>
+             
+             {/* Split Bill Result on Receipt */}
+             {personCount > 1 && (
+                <div className="mt-4 pt-3 border-t border-dashed border-gray-200 flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                    <span className="text-xs font-bold text-gray-500">Split ({personCount})</span>
+                    <span className="font-black text-lg text-sausage-700">
+                        {Math.ceil(totalPrice / personCount)} <span className="text-xs text-gray-400">/ person</span>
+                    </span>
+                </div>
+             )}
+
+             {/* Receipt Sawtooth Bottom */}
+             <div className="absolute bottom-0 left-0 right-0 h-2 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:16px_16px] mb-[-4px]"></div>
           </div>
 
-          {cartItems.map(({ item, quantity }) => (
-            <div key={item.id} className="border-b-2 border-dashed border-gray-200 pb-4 last:border-0">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  {/* BIG Original Name for Staff */}
-                  <h3 className="text-2xl font-black text-gray-900 leading-none mb-1">
-                    {item.originalName}
-                  </h3>
-                  {/* Small Translated Name for User */}
-                  <p className="text-gray-500 text-sm">{item.translatedName}</p>
-                </div>
-                <div className="flex items-center gap-2 pl-4">
-                  <span className="text-sausage-600 font-bold text-xl">x</span>
-                  <span className="text-4xl font-black text-sausage-600">{quantity}</span>
-                </div>
+          {/* Split Bill Calculator */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6">
+              <div className="flex items-center gap-2 mb-3 text-sausage-800 font-bold">
+                  <Users size={18} /> Split Bill
               </div>
-              <div className="text-right mt-1 text-gray-400 font-mono text-sm">
-                @{item.price} {menuData.originalCurrency}
+              <div className="flex items-center justify-between bg-gray-50 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setPersonCount(Math.max(1, personCount - 1))}
+                    className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-gray-600 active:scale-95 transition-transform"
+                  >
+                      -
+                  </button>
+                  <span className="font-black text-xl text-gray-800">{personCount}</span>
+                  <button 
+                    onClick={() => setPersonCount(personCount + 1)}
+                    className="w-10 h-10 bg-sausage-600 text-white rounded-lg shadow-sm flex items-center justify-center font-bold active:scale-95 transition-transform"
+                  >
+                      +
+                  </button>
               </div>
-            </div>
-          ))}
+          </div>
+
         </div>
 
-        {/* Footer */}
-        <div className="bg-sausage-50 p-6 border-t border-sausage-100">
-          <div className="flex justify-between items-end mb-4">
-            <span className="text-gray-500 font-bold uppercase tracking-wider text-sm">Total</span>
-            <span className="text-3xl font-black text-sausage-900">
-              {totalPrice} <span className="text-lg text-sausage-700">{menuData.originalCurrency}</span>
-            </span>
-          </div>
+        {/* Footer Actions */}
+        <div className="bg-white p-4 border-t border-gray-200 grid grid-cols-2 gap-3 safe-area-bottom">
+          <button 
+            onClick={handleShare}
+            className="flex flex-col items-center justify-center p-3 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold gap-1"
+          >
+            <Download size={20} />
+            <span className="text-xs">Save Image</span>
+          </button>
+          
           <button 
             onClick={onFinish}
-            className="w-full bg-sausage-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg active:bg-sausage-700 flex justify-center items-center gap-2"
+            className="flex flex-col items-center justify-center p-3 rounded-xl bg-sausage-600 text-white hover:bg-sausage-700 font-bold gap-1 shadow-md"
           >
-            <Home size={20} /> Finish & Return Home
+            <Home size={20} />
+            <span className="text-xs">Done</span>
           </button>
         </div>
       </div>
