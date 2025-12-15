@@ -12,7 +12,7 @@ export enum TargetLanguage {
   Spanish = 'Spanish',
   German = 'German',
   Vietnamese = 'Vietnamese',
-  Filipino = 'Filipino'  // ✅ 補上這個就不會報錯了
+  Filipino = 'Filipino'
 }
 
 export interface MenuItem {
@@ -23,7 +23,7 @@ export interface MenuItem {
   category: string;
   allergy_warning: boolean;
   dietary_tags: string[];
-  description: string;   // ✅ 我們統一叫 description，不叫 shortDescription
+  description: string;
 }
 
 export interface MenuData {

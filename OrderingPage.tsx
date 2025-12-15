@@ -27,10 +27,13 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [explainingId, setExplainingId] = useState<string | null>(null);
 
-  // 取得所有分類
+  // 確保 menuData 存在，避免崩潰
+  if (!menuData || !menuData.items) {
+      return <div>Loading...</div>;
+  }
+
   const categories = ['All', ...Array.from(new Set(menuData.items.map(i => i.category)))];
   
-  // 過濾顯示的菜色
   const displayedItems = selectedCategory === 'All' 
     ? menuData.items 
     : menuData.items.filter(i => i.category === selectedCategory);
@@ -52,7 +55,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* 頂部導航 */}
       <div className="bg-white p-4 shadow-sm flex items-center justify-between z-10 sticky top-0">
         <button onClick={onBack} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
           <ArrowLeft size={24} />
@@ -61,7 +63,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
         <div className="w-10"></div>
       </div>
 
-      {/* 分類選擇 */}
       <div className="overflow-x-auto p-4 flex gap-2 no-scrollbar bg-white border-b border-slate-100">
         {categories.map(cat => (
           <button
@@ -78,7 +79,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
         ))}
       </div>
 
-      {/* 菜單列表 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
         {displayedItems.map(item => (
           <div key={item.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4">
@@ -86,13 +86,10 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
               <div className="flex justify-between items-start">
                 <h3 className="font-bold text-slate-800">{item.translatedName}</h3>
                 <span className="font-medium text-orange-600">
-                  {/* 顯示預估台幣價格 */}
                   NT$ {Math.round(item.price * menuData.exchangeRate)}
                 </span>
               </div>
               <p className="text-xs text-slate-400">{item.originalName}</p>
-              
-              {/* ✅ 這裡修正了：使用 description 而不是 shortDescription */}
               <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
                 {item.description}
               </p>
@@ -113,7 +110,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
               </div>
             </div>
 
-            {/* 加減按鈕 */}
             <div className="flex flex-col items-center justify-center gap-3 border-l pl-4 border-slate-100">
               <button 
                 onClick={() => onUpdateCart(item.id, 1)}
@@ -139,7 +135,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
         ))}
       </div>
 
-      {/* 底部購物車條 */}
       {totalItems > 0 && (
         <div className="absolute bottom-6 left-6 right-6">
           <button 
