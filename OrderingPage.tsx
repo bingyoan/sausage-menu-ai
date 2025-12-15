@@ -27,7 +27,6 @@ export const OrderingPage: React.FC<OrderingPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [explainingId, setExplainingId] = useState<string | null>(null);
 
-  // 確保 menuData 存在，避免崩潰
   if (!menuData || !menuData.items) {
       return <div>Loading...</div>;
   }
