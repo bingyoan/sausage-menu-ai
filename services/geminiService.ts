@@ -1,10 +1,10 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // ⚡️ 修正點一：使用舊版導出的 SchemaType
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // ⚡️ 這裡必須是 SchemaType
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
 const menuSchema = {
-  type: SchemaType.OBJECT, // ⚡️ 修正點二：使用 SchemaType.OBJECT
+  type: SchemaType.OBJECT, 
   properties: {
     originalCurrency: { type: SchemaType.STRING },
     exchangeRate: { type: SchemaType.NUMBER },
@@ -54,8 +54,7 @@ export const parseMenuImage = async (
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash-lite", 
-      // ⚡️ 修正點三：將 responseSchema 放在 config 物件內 (這是舊版寫法)
-      config: { 
+      config: { // ⚡️ 修正點三：必須有 config 物件包裹 responseSchema
         responseSchema: menuSchema,
       },
     });
