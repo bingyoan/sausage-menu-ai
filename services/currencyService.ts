@@ -1,6 +1,5 @@
-// src/services/currencyService.ts
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 這是免費的公開匯率 API
 const API_URL = "https://open.er-api.com/v6/latest"; 
 
 export const fetchExchangeRate = async (
@@ -8,36 +7,82 @@ export const fetchExchangeRate = async (
   targetCurrency: string
 ): Promise<number | null> => {
   try {
-    // 如果幣別一樣，匯率就是 1
-    if (baseCurrency === targetCurrency) return 1;
-
-    // 處理常見縮寫錯誤 (AI 有時候會回傳 JP 或 JPN)
     const normalizedBase = normalizeCurrencyCode(baseCurrency);
     const normalizedTarget = normalizeCurrencyCode(targetCurrency);
 
-    // 抓取匯率
+    if (normalizedBase === normalizedTarget) return 1;
+
+    // 使用簡單的 console.log 避免特殊字元問題
+    console.log("Checking Rate:", normalizedBase, "->", normalizedTarget);
+
     const response = await fetch(`${API_URL}/${normalizedBase}`);
+    
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+    }
+
     const data = await response.json();
 
     if (data && data.rates && data.rates[normalizedTarget]) {
-      console.log(`匯率更新成功: 1 ${normalizedBase} = ${data.rates[normalizedTarget]} ${normalizedTarget}`);
-      return data.rates[normalizedTarget];
+      const rate = data.rates[normalizedTarget];
+      console.log("Rate found:", rate);
+      return rate;
+    } else {
+      console.warn("Rate not found for:", normalizedTarget);
+      return null;
     }
     
-    return null;
   } catch (error) {
-    console.error("匯率抓取失敗，將使用 AI 預估值:", error);
+    console.error("Currency service error:", error);
     return null;
   }
 };
 
-// 簡單的幣別標準化工具
 const normalizeCurrencyCode = (code: string): string => {
+  if (!code) return 'JPY';
+
   const c = code.toUpperCase().trim();
-  if (c === 'JP' || c === 'JPN' || c === 'YEN' || c.includes('YEN')) return 'JPY';
-  if (c === 'TW' || c === 'TWN' || c === 'NT' || c === 'NTD') return 'TWD';
-  if (c === 'US' || c === 'USA') return 'USD';
-  if (c === 'EU' || c === 'EURO') return 'EUR';
-  if (c === 'KR' || c === 'KOR' || c === 'WON') return 'KRW';
-  return c; // 預設直接回傳
+
+  // Japan
+  if (c.includes('JPY') || c.includes('JP') || c.includes('YEN') || c.includes('¥') || c.includes('円')) {
+    return 'JPY';
+  }
+
+  // Korea
+  if (c.includes('KRW') || c.includes('KR') || c.includes('WON') || c.includes('₩') || c.includes('원')) {
+    return 'KRW';
+  }
+
+  // Thailand
+  if (c.includes('THB') || c.includes('TH') || c.includes('BAHT') || c.includes('฿') || c.includes('บาท')) {
+    return 'THB';
+  }
+
+  // Europe
+  if (c.includes('EUR') || c.includes('EU') || c.includes('EURO') || c.includes('€')) {
+    return 'EUR';
+  }
+
+  // USA
+  if (c.includes('USD') || c.includes('US') || c.includes('DOLLAR') || c === '$') {
+    return 'USD';
+  }
+  
+  // UK
+  if (c.includes('GBP') || c.includes('UK') || c.includes('POUND') || c.includes('£')) {
+    return 'GBP';
+  }
+
+  // Taiwan
+  if (c.includes('TWD') || c.includes('TW') || c.includes('NT') || c === '元') {
+    return 'TWD';
+  }
+
+  // Vietnam
+  if (c.includes('VND') || c.includes('DONG') || c.includes('₫') || c.includes('đ')) {
+    return 'VND';
+  }
+
+  // Fallback: Remove non-alphabet characters
+  return c.replace(/[^A-Z]/g, '');
 };
