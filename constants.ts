@@ -1,10 +1,8 @@
-// src/constants.ts
 import { TargetLanguage } from './types';
 
-// 這是 Gumroad 的產品連結，如果還沒申請可以先放空字串
+// 這是 Gumroad 的產品連結
 export const GUMROAD_PRODUCT_PERMALINK = 'sausage-menu-ai'; 
 
-// 這是語言選單的設定
 export const LANGUAGE_OPTIONS = [
   { code: TargetLanguage.ChineseTW, label: '🇹🇼 繁體中文', flag: '🇹🇼' },
   { code: TargetLanguage.English, label: '🇺🇸 English', flag: '🇺🇸' },

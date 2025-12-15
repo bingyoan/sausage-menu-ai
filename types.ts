@@ -1,5 +1,3 @@
-// src/types.ts
-
 export type AppState = 'welcome' | 'processing' | 'ordering' | 'summary' | 'history';
 
 export enum TargetLanguage {
