@@ -1,26 +1,26 @@
-import { GoogleGenerativeAI, Type } from "@google/generative-ai"; // ⚡️ 修正點一：確定使用 Type
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // ⚡️ 修正點一：使用舊版導出的 SchemaType
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
 const menuSchema = {
-  type: Type.OBJECT, // ⚡️ 修正點二：使用 Type.OBJECT (如果 Type 找不到，就是 package.json 裡的套件版本沒抓到)
+  type: SchemaType.OBJECT, // ⚡️ 修正點二：使用 SchemaType.OBJECT
   properties: {
-    originalCurrency: { type: Type.STRING },
-    exchangeRate: { type: Type.NUMBER },
-    detectedLanguage: { type: Type.STRING },
+    originalCurrency: { type: SchemaType.STRING },
+    exchangeRate: { type: SchemaType.NUMBER },
+    detectedLanguage: { type: SchemaType.STRING },
     items: {
-      type: Type.ARRAY,
+      type: SchemaType.ARRAY,
       items: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          originalName: { type: Type.STRING },
-          translatedName: { type: Type.STRING },
-          price: { type: Type.NUMBER },
-          category: { type: Type.STRING },
-          allergy_warning: { type: Type.BOOLEAN },
-          dietary_tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-          description: { type: Type.STRING }
+          originalName: { type: SchemaType.STRING },
+          translatedName: { type: SchemaType.STRING },
+          price: { type: SchemaType.NUMBER },
+          category: { type: SchemaType.STRING },
+          allergy_warning: { type: SchemaType.BOOLEAN },
+          dietary_tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          description: { type: SchemaType.STRING }
         },
         required: ["originalName", "translatedName", "price", "allergy_warning"],
       },
@@ -54,9 +54,10 @@ export const parseMenuImage = async (
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash-lite", 
-      // ⚡️ 修正點三：直接使用 responseSchema，不使用 responseMimeType
-      responseSchema: menuSchema, 
-      // 舊版套件在這邊不需要額外的 config 物件來包裹
+      // ⚡️ 修正點三：將 responseSchema 放在 config 物件內 (這是舊版寫法)
+      config: { 
+        responseSchema: menuSchema,
+      },
     });
     
     const result = await model.generateContent([prompt, ...imageParts]); 
@@ -64,7 +65,6 @@ export const parseMenuImage = async (
     const text = response.text();
     if (!text) throw new Error("No response");
 
-    // 由於我們將 responseMimeType 刪除，這裡必須確保 JSON 輸出
     const textToParse = text.startsWith('```json') ? text.substring(7, text.length - 3).trim() : text.trim();
     
     const parsed = JSON.parse(textToParse);
