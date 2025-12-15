@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import { AppState, TargetLanguage, MenuData, Cart, CartItem, HistoryRecord } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { MenuProcessing } from './components/MenuProcessing';
@@ -10,6 +9,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { LicenseModal } from './components/LicenseModal';
 import { parseMenuImage } from './services/geminiService';
 import { GUMROAD_PRODUCT_PERMALINK } from './constants';
+import { Toaster, toast } from 'react-hot-toast';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('welcome');
@@ -25,29 +26,29 @@ const App: React.FC = () => {
   
   // Modal State
   const [showLicenseModal, setShowLicenseModal] = useState<boolean>(false);
-
-  // Settings Modal (Optional)
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // 1. Initialization: Load Storage
   useEffect(() => {
-    // Load History
     const savedHistory = localStorage.getItem('sausage_menu_history');
     if (savedHistory) setHistory(JSON.parse(savedHistory));
 
-    // Load Google API Key
     const savedApiKey = localStorage.getItem('sausage_google_api_key');
-    if (savedApiKey) setApiKey(savedApiKey);
+    if (savedApiKey) {
+        setApiKey(savedApiKey);
+    } else {
+        // UX: Auto open settings if no key found on first load
+        setTimeout(() => setShowSettings(true), 1000);
+    }
 
-    // Load License Key
     const savedLicenseKey = localStorage.getItem('sausage_license_key');
     if (savedLicenseKey) {
         setLicenseKey(savedLicenseKey);
-        verifyLicense(savedLicenseKey, true); // Auto verify on load
+        verifyLicense(savedLicenseKey, true);
     }
   }, []);
 
-  // 2. Persistence: Auto-save Google API Key whenever it changes
+  // 2. Persistence
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem('sausage_google_api_key', apiKey);
@@ -72,28 +73,29 @@ const App: React.FC = () => {
       if (data.success && !data.purchase.refunded && !data.purchase.chargebacked) {
         setIsVerified(true);
         setLicenseKey(key.trim());
-        // Save to storage on success
         localStorage.setItem('sausage_license_key', key.trim());
+        if(!isAutoCheck) toast.success("License Verified! Pro Mode Unlocked.");
         return true;
       } else {
         setIsVerified(false);
         if (!isAutoCheck) {
-            localStorage.removeItem('sausage_license_key'); 
+            localStorage.removeItem('sausage_license_key');
+            toast.error("Invalid License Key");
         }
         return false;
       }
     } catch (err) {
       console.error("Verification Error", err);
+      if(!isAutoCheck) toast.error("Verification Failed");
       return false;
     }
   };
 
-  // Wrapper to update state
   const handleApiKeyChange = (key: string) => {
       setApiKey(key);
+      if(key) toast.success("API Key Saved");
   };
 
-  // Helper: Compress Image using Canvas
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -103,7 +105,7 @@ const App: React.FC = () => {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1024; // Resize to max 1024px width for speed
+          const MAX_WIDTH = 1024;
           const MAX_HEIGHT = 1024;
           let width = img.width;
           let height = img.height;
@@ -124,9 +126,8 @@ const App: React.FC = () => {
           const ctx = canvas.getContext('2d');
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
-            // Compress to JPEG with 0.6 quality
             const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-            resolve(dataUrl.split(',')[1]); // Return base64 body
+            resolve(dataUrl.split(',')[1]);
           } else {
              reject(new Error("Canvas context failed"));
           }
@@ -137,31 +138,28 @@ const App: React.FC = () => {
     });
   };
 
-  // 4. Image Handling (Strict License Check)
   const handleImagesSelected = async (files: File[]) => {
     if (!apiKey) {
-        alert("Please enter a Google API Key first.");
+        toast.error("Please set your Google API Key in Settings first.");
+        setShowSettings(true);
         return;
     }
 
     if (files.length === 0) return;
 
-    // Strict Permission Check: Must be verified
     if (!isVerified) {
         setShowLicenseModal(true);
         return;
     }
 
-    // Limit to 3 images
     const filesToProcess = files.slice(0, 3);
     if (files.length > 3) {
-        alert("Maximum 3 images allowed. Processing the first 3.");
+        toast("Max 3 images. Processing first 3.", { icon: '⚠️' });
     }
 
     setAppState('processing');
     
     try {
-      // Compress and convert all files to base64
       const base64Promises = filesToProcess.map(file => compressImage(file));
       const base64Images = await Promise.all(base64Promises);
 
@@ -171,12 +169,12 @@ const App: React.FC = () => {
         setAppState('ordering');
       } catch (error) {
         console.error(error);
-        alert("Failed to parse menu. Please check your API Key and try again.");
+        toast.error("Failed to parse menu. Check your API Key.");
         setAppState('welcome');
       }
     } catch (error) {
       console.error("Image processing error:", error);
-      alert("Error processing images.");
+      toast.error("Error processing images.");
       setAppState('welcome');
     }
   };
@@ -202,12 +200,14 @@ const App: React.FC = () => {
     setCart({});
     setMenuData(null);
     setAppState('welcome');
+    toast.success("Order finished & saved to history!");
   };
 
   const deleteHistoryItem = (id: string) => {
     const newHistory = history.filter(h => h.id !== id);
     setHistory(newHistory);
     localStorage.setItem('sausage_menu_history', JSON.stringify(newHistory));
+    toast.success("History deleted");
   };
 
   const updateCart = (itemId: string, delta: number) => {
@@ -226,8 +226,17 @@ const App: React.FC = () => {
     });
   };
 
+  // Animation Variants
+  const pageVariants = {
+    initial: { opacity: 0, x: 20 },
+    animate: { opacity: 1, x: 0 },
+    exit: { opacity: 0, x: -20 }
+  };
+
   return (
-    <div className="h-full w-full max-w-md mx-auto bg-white shadow-2xl relative">
+    <div className="h-full w-full max-w-md mx-auto bg-white shadow-2xl relative overflow-hidden font-sans">
+        <Toaster position="top-center" toastOptions={{ style: { borderRadius: '12px', background: '#333', color: '#fff' } }} />
+
         <SettingsModal 
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
@@ -241,58 +250,80 @@ const App: React.FC = () => {
             onVerify={verifyLicense}
         />
 
-        {appState === 'welcome' && (
-          <WelcomeScreen 
-            selectedLanguage={targetLanguage} 
-            onLanguageChange={setTargetLanguage}
-            onImagesSelected={handleImagesSelected}
-            onViewHistory={() => setAppState('history')}
-            
-            apiKey={apiKey}
-            onApiKeyChange={handleApiKeyChange}
-            licenseKey={licenseKey}
-            isVerified={isVerified}
-            onVerifyLicense={verifyLicense}
-          />
-        )}
+        <AnimatePresence mode="wait">
+            {appState === 'welcome' && (
+              <motion.div key="welcome" {...pageVariants} className="h-full">
+                  <WelcomeScreen 
+                    selectedLanguage={targetLanguage} 
+                    onLanguageChange={setTargetLanguage}
+                    onImagesSelected={handleImagesSelected}
+                    onViewHistory={() => setAppState('history')}
+                    onOpenSettings={() => setShowSettings(true)}
+                    isVerified={isVerified}
+                    hasApiKey={!!apiKey}
+                  />
+              </motion.div>
+            )}
 
-        {appState === 'history' && (
-          <HistoryPage 
-              history={history}
-              onBack={() => setAppState('welcome')}
-              onDelete={deleteHistoryItem}
-          />
-        )}
+            {appState === 'history' && (
+              <motion.div key="history" {...pageVariants} className="h-full">
+                  <HistoryPage 
+                      history={history}
+                      onBack={() => setAppState('welcome')}
+                      onDelete={deleteHistoryItem}
+                  />
+              </motion.div>
+            )}
 
-        {appState === 'processing' && (
-          <MenuProcessing />
-        )}
+            {appState === 'processing' && (
+              <motion.div key="processing" {...pageVariants} className="h-full">
+                  <MenuProcessing />
+              </motion.div>
+            )}
 
-        {appState === 'ordering' && menuData && (
-          <OrderingPage 
-            apiKey={apiKey}
-            menuData={menuData}
-            cart={cart}
-            targetLang={targetLanguage}
-            onUpdateCart={updateCart}
-            onViewSummary={() => setAppState('summary')}
-            onBack={() => {
-              if(confirm("Start over? Cart will be lost.")) {
-                  setCart({});
-                  setAppState('welcome');
-              }
-            }}
-          />
-        )}
+            {appState === 'ordering' && menuData && (
+              <motion.div key="ordering" {...pageVariants} className="h-full">
+                  <OrderingPage 
+                    apiKey={apiKey}
+                    menuData={menuData}
+                    cart={cart}
+                    targetLang={targetLanguage}
+                    onUpdateCart={updateCart}
+                    onViewSummary={() => setAppState('summary')}
+                    onBack={() => {
+                      if(Object.keys(cart).length > 0) {
+                          toast.custom((t) => (
+                             <div className="bg-white p-4 rounded-xl shadow-xl border-2 border-sausage-200">
+                                <p className="font-bold mb-2">Discard current order?</p>
+                                <div className="flex gap-2">
+                                    <button onClick={() => toast.dismiss(t.id)} className="flex-1 py-2 bg-gray-100 rounded-lg">Cancel</button>
+                                    <button onClick={() => { 
+                                        toast.dismiss(t.id);
+                                        setCart({}); 
+                                        setAppState('welcome'); 
+                                    }} className="flex-1 py-2 bg-red-500 text-white rounded-lg">Discard</button>
+                                </div>
+                             </div>
+                          ));
+                      } else {
+                          setAppState('welcome');
+                      }
+                    }}
+                  />
+              </motion.div>
+            )}
 
-        {appState === 'summary' && menuData && (
-          <OrderSummary 
-            cart={cart} 
-            menuData={menuData} 
-            onClose={() => setAppState('ordering')}
-            onFinish={saveToHistory}
-          />
-        )}
+            {appState === 'summary' && menuData && (
+              <motion.div key="summary" initial={{ opacity: 0, y: "100%" }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: "100%" }} className="h-full absolute inset-0 z-50">
+                  <OrderSummary 
+                    cart={cart} 
+                    menuData={menuData} 
+                    onClose={() => setAppState('ordering')}
+                    onFinish={saveToHistory}
+                  />
+              </motion.div>
+            )}
+        </AnimatePresence>
       </div>
   );
 };
