@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Upload, History, Settings, Globe } from 'lucide-react'; // 導入所有需要的 icon
+import { Camera, Upload, History, Settings, Globe, CheckCircle } from 'lucide-react'; // ⚡️ 修正點一：在這裡加入 CheckCircle
 import { TargetLanguage } from '../types';
 import { LANGUAGE_OPTIONS } from '../constants';
-import { SausageDogLogo, PawPrint } from './DachshundAssets'; // 導入臘腸狗 logo
+import { SausageDogLogo, PawPrint } from './DachshundAssets'; 
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -10,10 +10,9 @@ import toast from 'react-hot-toast';
 interface WelcomeScreenProps {
   selectedLanguage: TargetLanguage;
   onLanguageChange: (lang: TargetLanguage) => void;
-  onImagesSelected: (files: File[]) => void; // 新版使用 onImagesSelected
+  onImagesSelected: (files: File[]) => void; 
   onViewHistory: () => void;
   onOpenSettings: () => void;
-  // 注意：我們不需要 hasKey，因為 License 邏輯現在寫在這個元件裡面
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -24,14 +23,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onOpenSettings
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null); // 舊版有這個，所以我們也保留
+  const cameraInputRef = useRef<HTMLInputElement>(null); 
   
-  // ⚡️ 修正點一：保留新版的所有狀態邏輯 (License & Android Check)
   const [isAndroidApp, setIsAndroidApp] = useState(false);
   const [isLicenseVerified, setIsLicenseVerified] = useState(false);
 
   useEffect(() => {
-    // 偵測網址參數，這是 Android App 的通關密語
     const params = new URLSearchParams(window.location.search);
     const platform = params.get('platform');
     const savedLicense = localStorage.getItem('sausage_license_key');
@@ -47,7 +44,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
-      // ⚡️ 修正點二：舊版介面使用單張圖片，但我們呼叫新版的多圖處理函式
       onImagesSelected(Array.from(event.target.files)); 
     }
   };
@@ -63,10 +59,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     }
   };
 
-  // 決定按鈕是否應該被啟用 (如果已驗證或是在 App 內)
   const isEnabled = isAndroidApp || isLicenseVerified;
   
-  // ⚡️ 修正點三：使用舊介面的 HTML/JSX 結構
   return (
     <div className="flex flex-col items-center justify-center min-h-full p-6 text-center space-y-8 relative overflow-hidden">
       
@@ -83,7 +77,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         >
           <History size={20} />
         </button>
-        {/* ⚡️ 修正點四：設定按鈕樣式現在根據是否有 Key 來決定 */}
         <button 
           onClick={onOpenSettings}
           className={`p-3 rounded-full transition-colors shadow-sm border ${isLicenseVerified ? 'bg-white text-sausage-700 border-sausage-100' : 'bg-sausage-600 text-white border-sausage-600 animate-pulse'}`}
@@ -108,7 +101,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
       <div className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-xl z-10 border-4 border-sausage-100">
         
-        {/* ⚡️ 修正點五：如果沒有 Key 且不是 App，顯示輸入序號按鈕 */}
         {!isEnabled && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
               <button 
@@ -134,7 +126,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             className="w-full p-3 bg-sausage-50 border-2 border-sausage-200 rounded-xl text-sausage-900 focus:outline-none focus:border-sausage-500 font-semibold"
           >
             {LANGUAGE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <option key={opt.code} value={opt.code}> {/* ⚡️ 修正點二＆三：將 opt.value 替換為 opt.code */}
                 {opt.label}
               </option>
             ))}
@@ -175,7 +167,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         />
       </div>
       
-      {/* Footer / AI 說明 */}
       <p className="text-center text-xs text-slate-400 mt-4 mb-4">
         Powered by Google Gemini 2.5 Flash Lite
       </p>
