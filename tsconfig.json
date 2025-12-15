@@ -1,25 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["DOM", "DOMIterable", "ESNext"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    /* ⚡️ 修正點一：確保使用 Node 模組解析，能找到 @types/ */
-    "moduleResolution": "node", 
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "allowSyntheticDefaultImports": true, // ⚡️ 修正點二：允許非預設導出的模組正確導入 (如 framer-motion)
-
-    /* Linting */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
     "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "components/**/*", "services/**/*", "*.ts", "*.tsx"] // ⚡️ 修正點三：確保所有程式碼目錄都被掃描
+  "include": ["src"]
 }
