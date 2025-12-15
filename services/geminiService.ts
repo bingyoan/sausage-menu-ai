@@ -1,13 +1,14 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
+import { fetchExchangeRate } from './currencyService'; // 👈 記得匯入剛剛寫的新服務
 
-// 定義回傳格式 (Schema) - 包含 AI 新增的過敏原欄位
+// 定義回傳格式 (Schema)
 const menuSchema = {
   type: SchemaType.OBJECT,
   properties: {
     originalCurrency: { type: SchemaType.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
-    exchangeRate: { type: SchemaType.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
+    exchangeRate: { type: SchemaType.NUMBER, description: "Just a rough estimate. We will correct this with real API later." }, // 👈 改了描述，告訴 AI 隨便猜就好
     detectedLanguage: { type: SchemaType.STRING, description: "The primary language detected on the menu." },
     items: {
       type: SchemaType.ARRAY,
@@ -39,15 +40,10 @@ export const parseMenuImage = async (
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // 1. 清洗 Key
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
-
-  // 2. 初始化 SDK
   const genAI = new GoogleGenerativeAI(cleanApiKey);
   
-  // 3. 指定模型：改用 "gemini-2.5-flash-lite"
-  // 1.5 Flash 已於 2025/9 退役，2.5 Flash 額度太少(20次)。
-  // 2.5 Flash-Lite 是 Google 官方推薦的高流量替代品。
+  // 使用 gemini-2.5-flash-lite (目前最穩定的免費大量模型)
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash-lite", 
     generationConfig: {
@@ -89,6 +85,17 @@ export const parseMenuImage = async (
 
     const parsed = JSON.parse(text);
 
+    // 🚀【新增功能】自動修正匯率
+    // 1. 拿到 AI 辨識出的幣別 (例如 "JPY")
+    const detectedCurrency = parsed.originalCurrency || 'JPY';
+    
+    // 2. 去問外部 API 真正的匯率
+    console.log(`正在抓取即時匯率: ${detectedCurrency} -> ${targetCurrency}`);
+    const realExchangeRate = await fetchExchangeRate(detectedCurrency, targetCurrency);
+
+    // 3. 如果抓到了，就覆蓋掉 AI 猜的數字；沒抓到就用 AI 猜的當備案
+    const finalExchangeRate = realExchangeRate || parsed.exchangeRate || 0.22;
+
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
@@ -100,21 +107,17 @@ export const parseMenuImage = async (
 
     return {
       items: itemsWithIds,
-      originalCurrency: parsed.originalCurrency || '???',
+      originalCurrency: detectedCurrency, // 確保回傳正確的幣別代碼
       targetCurrency: targetCurrency,
-      exchangeRate: parsed.exchangeRate || 1,
+      exchangeRate: finalExchangeRate,    // 這裡回傳的一定是精準匯率
       detectedLanguage: parsed.detectedLanguage || 'Unknown'
     };
 
   } catch (error) {
     console.error("Gemini Parse Error:", error);
-    // 錯誤處理：如果連 Lite 都 404，提示用戶檢查 Key 權限
     const errStr = String(error);
-    if (errStr.includes("404")) {
-       throw new Error("找不到模型，請確認您的 API Key 是否支援 Gemini 2.5 Flash-Lite");
-    }
     if (errStr.includes("429")) {
-       throw new Error("使用額度已滿，請稍後再試。");
+       throw new Error("今日 AI 使用額度已滿，請稍後再試。");
     }
     throw new Error(`AI 連線失敗: ${error}`);
   }
@@ -128,7 +131,6 @@ export const explainDish = async (
 ): Promise<string> => {
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
   const genAI = new GoogleGenerativeAI(cleanApiKey);
-  // 解說部分也改用 Lite
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const prompt = `Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
