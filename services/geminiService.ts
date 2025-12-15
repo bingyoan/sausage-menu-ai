@@ -1,32 +1,33 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { MenuItem, MenuData, TargetLanguage } from '../types';
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 
-// Schema for the menu parsing response
-const menuSchema: Schema = {
-  type: Type.OBJECT,
+// 定義回傳格式 (Schema) - 包含 AI 新增的過敏原欄位
+const menuSchema = {
+  type: SchemaType.OBJECT,
   properties: {
-    originalCurrency: { type: Type.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
-    exchangeRate: { type: Type.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
-    detectedLanguage: { type: Type.STRING, description: "The primary language detected on the menu." },
+    originalCurrency: { type: SchemaType.STRING, description: "The currency code found on the menu (e.g., JPY, EUR, USD)." },
+    exchangeRate: { type: SchemaType.NUMBER, description: "Estimated exchange rate: 1 unit of Menu Currency = X units of User's Target Currency." },
+    detectedLanguage: { type: SchemaType.STRING, description: "The primary language detected on the menu." },
     items: {
-      type: Type.ARRAY,
+      type: SchemaType.ARRAY,
       items: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          originalName: { type: Type.STRING },
-          translatedName: { type: Type.STRING },
-          price: { type: Type.NUMBER, description: "Numeric price value only. If the menu lists tax-inclusive prices, use that." },
-          category: { type: Type.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
-          shortDescription: { type: Type.STRING, description: "Very brief (5-8 words) description of what the dish is/ingredients." },
-          allergy_warning: { type: Type.BOOLEAN, description: "True if the dish likely contains common allergens (Nuts, Seafood, Dairy, Eggs, Gluten)." },
+          originalName: { type: SchemaType.STRING },
+          translatedName: { type: SchemaType.STRING },
+          price: { type: SchemaType.NUMBER, description: "Numeric price value only. Use tax-inclusive price if available." },
+          category: { type: SchemaType.STRING, description: "Category found on menu like 'Appetizer', 'Main', 'Drink', or 'Others'" },
+          // ✨ 保留新功能：過敏原與飲食標籤
+          allergy_warning: { type: SchemaType.BOOLEAN, description: "True if the dish contains common allergens (nuts, dairy, seafood, beef, pork)." },
           dietary_tags: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "Tags like 'Spicy', 'Vegan', 'Vegetarian', 'Gluten-Free', 'Contains Nuts', 'Seafood'." 
-          }
+            type: SchemaType.ARRAY, 
+            items: { type: SchemaType.STRING },
+            description: "Tags like 'Spicy', 'Vegetarian', 'Contains Nuts', 'Contains Beef', 'Contains Pork', 'Seafood'." 
+          },
+          description: { type: SchemaType.STRING, description: "A short, appetizing description of the dish (texture, taste)." }
         },
-        required: ["originalName", "translatedName", "price", "category"],
+        required: ["originalName", "translatedName", "price", "allergy_warning"],
       },
     },
   },
@@ -35,58 +36,65 @@ const menuSchema: Schema = {
 
 export const parseMenuImage = async (
   apiKey: string,
-  base64Images: string[], // Changed to accept array
+  base64Images: string[], 
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
   
-  // Initialize AI with the user's key
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  // 1. 清洗 Key
+  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
+
+  // 2. 初始化 SDK (這裡改回了 @google/generative-ai，解決報錯！)
+  const genAI = new GoogleGenerativeAI(cleanApiKey);
+  
+  // 3. 指定模型 (使用最穩定的 1.5 Flash)
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash", 
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: menuSchema,
+    },
+    systemInstruction: `You are a professional menu translator. 
+    1. OCR the menu images.
+    2. Translate to ${targetLanguage}.
+    3. Categorize items.
+    4. Identify allergens (Nuts, Dairy, Seafood) and set 'allergy_warning' to true if found.
+    5. Generate a short description.`
+  });
+
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   const prompt = `
-    Analyze ${base64Images.length} menu image(s).
-    Extract all items, merge duplicates, group by category.
-    Translate to ${targetLanguage}.
-    Detect currency and provide rate to ${targetCurrency}.
-    Use tax-inclusive prices.
-    
-    CRITICAL INSTRUCTION: Analyze dish names for potential allergens (Nuts, Seafood, Dairy, Pork, Beef). 
-    If a dish is likely to trigger common allergies, set 'allergy_warning' to true and add relevant 'dietary_tags'.
-    Provide a 'shortDescription' for every item explaining what it is briefly.
-    
-    Return JSON.
+    TASK: Analyze ${base64Images.length} menu image(s).
+    1. Extract items.
+    2. Translate to ${targetLanguage}.
+    3. Detect Currency & Exchange Rate to ${targetCurrency}.
+    4. Price: use TAX-INCLUSIVE.
+    5. Return SINGLE JSON.
   `;
 
-  // Prepare parts: text prompt + all images
-  const parts: any[] = [{ text: prompt }];
-  base64Images.forEach(img => {
-      parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
-  });
+  const imageParts = base64Images.map(img => ({
+    inlineData: {
+      data: img,
+      mimeType: "image/jpeg"
+    }
+  }));
 
   try {
-    // Using gemini-2.5-flash for stability
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: parts
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: menuSchema,
-        systemInstruction: "You are a professional menu translator and nutritionist. Extract items accurately and identify dietary concerns."
-      }
-    });
+    const result = await model.generateContent([prompt, ...imageParts]);
+    const response = await result.response;
+    const text = response.text();
 
-    const text = response.text;
     if (!text) throw new Error("No response from AI");
 
     const parsed = JSON.parse(text);
 
-    // Add unique IDs to items
     const itemsWithIds = parsed.items.map((item: any, index: number) => ({
       ...item,
       id: `item-${index}-${Date.now()}`,
       category: item.category || 'General',
+      allergy_warning: item.allergy_warning || false,
+      dietary_tags: item.dietary_tags || [],
+      description: item.description || ''
     }));
 
     return {
@@ -99,7 +107,7 @@ export const parseMenuImage = async (
 
   } catch (error) {
     console.error("Gemini Parse Error:", error);
-    throw error;
+    throw new Error(`AI 連線失敗: ${error}`);
   }
 };
 
@@ -109,29 +117,17 @@ export const explainDish = async (
   originalLang: string,
   targetLang: TargetLanguage
 ): Promise<string> => {
-  
-  // Initialize AI with the user's key
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
+  const genAI = new GoogleGenerativeAI(cleanApiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-  const prompt = `
-    Explain the dish "${dishName}" (which is in ${originalLang}).
-    Translate the concept and ingredients briefly into ${targetLang}.
-    Keep it short (1 sentence), fun, and appetizing.
-    Don't just repeat the translation, explain WHAT it is.
-  `;
+  const prompt = `Explain dish "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'text/plain',
-      }
-    });
-
-    return response.text || "No explanation available.";
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text() || "No explanation.";
   } catch (error) {
-    console.error("Gemini Explain Error:", error);
     return "Could not load explanation.";
   }
 };
