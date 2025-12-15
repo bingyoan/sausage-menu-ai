@@ -10,17 +10,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.1.0",
     "framer-motion": "^10.16.4",
+    "html2canvas": "^1.4.1",      /* ⚡️ 修正點二：新增 html2canvas */
     "lucide-react": "^0.284.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-hot-toast": "^2.4.1"
+    "react-hot-toast": "^2.4.1",
+    "@google/generative-ai": "^0.1.0" /* ⚡️ 注意：我們必須用 0.1.0 來確保它找到舊的 SchemaType */
   },
   "devDependencies": {
+    "@types/node": "^20.11.20",
     "@types/react": "^18.2.25",
     "@types/react-dom": "^18.2.11",
-    "@types/node": "^20.11.20",
+    "@types/html2canvas": "^1.0.0", /* ⚡️ 修正點三：新增 html2canvas 的類型定義 */
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitejs/plugin-react": "^4.0.3",
