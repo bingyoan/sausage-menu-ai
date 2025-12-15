@@ -2,25 +2,24 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": ["DOM", "DOMIterable", "ESNext"],
     "module": "ESNext",
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
+    /* ⚡️ 修正點一：確保使用 Node 模組解析，能找到 @types/ */
+    "moduleResolution": "node", 
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true, // ⚡️ 修正點二：允許非預設導出的模組正確導入 (如 framer-motion)
 
-    /* ⚡️ 修正點一：關閉未讀取警告，解決 TS6133 錯誤 */
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    
     /* Linting */
     "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["src/**/*", "components/**/*", "services/**/*", "*.ts", "*.tsx"] // ⚡️ 修正點三：確保所有程式碼目錄都被掃描
 }
