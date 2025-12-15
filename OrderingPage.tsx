@@ -1,4 +1,3 @@
-// src/components/OrderingPage.tsx
 import React, { useState } from 'react';
 import { MenuData, Cart, TargetLanguage } from '../types';
 import { ShoppingCart, ArrowLeft, AlertTriangle, Info } from 'lucide-react';
