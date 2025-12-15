@@ -25,6 +25,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const [isLicenseVerified, setIsLicenseVerified] = useState(false);
 
   useEffect(() => {
+    // 偵測網址參數，這是 Android App 的通關密語
     const params = new URLSearchParams(window.location.search);
     const platform = params.get('platform');
     const savedLicense = localStorage.getItem('sausage_license_key');
@@ -151,7 +152,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           {isLicenseVerified ? '開始掃描菜單' : '試用掃描 (免序號)'}
         </button>
         <p className="text-center text-xs text-slate-400 mt-4">
-          Powered by Google Gemini 2.0 Flash
+          Powered by Google Gemini 2.5 Flash Lite
         </p>
       </div>
     </div>
