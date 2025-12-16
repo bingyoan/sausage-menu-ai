@@ -1,9 +1,10 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { MenuData, TargetLanguage } from '../types';
-import { getTargetCurrency } from '../constants';
+// 注意：TargetLanguage 改從 constants 引入，MenuData 從 types 引入
+import { MenuData } from '../types';
+import { TargetLanguage, getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
-// 1. 修改資料結構 (Schema) - 為了支援雙價格 (例如: 正常 $120 / 雙倍肉 $190)
+// 1. 修改資料結構 (Schema) - 支援雙價格與變體
 const menuSchema = {
   type: SchemaType.OBJECT,
   properties: {
@@ -17,18 +18,18 @@ const menuSchema = {
         properties: {
           originalName: { type: SchemaType.STRING },
           translatedName: { type: SchemaType.STRING },
-          price: { type: SchemaType.NUMBER }, // 主價格 (低價)
+          price: { type: SchemaType.NUMBER }, // 主價格
           category: { type: SchemaType.STRING },
           allergy_warning: { type: SchemaType.BOOLEAN },
           description: { type: SchemaType.STRING },
-          // 這裡儲存變體選項 (如：雙倍肉、加大)
+          // 新增 options 欄位 (如：雙倍肉、大杯)
           options: {
             type: SchemaType.ARRAY,
             items: {
               type: SchemaType.OBJECT,
               properties: {
-                name: { type: SchemaType.STRING }, // e.g., "雙倍肉"
-                price: { type: SchemaType.NUMBER } // e.g., 190
+                name: { type: SchemaType.STRING },
+                price: { type: SchemaType.NUMBER }
               }
             }
           },
@@ -46,13 +47,13 @@ export const parseMenuImage = async (
   base64Images: string[], 
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
+  // 簡單清理 API Key
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
   const genAI = new GoogleGenerativeAI(cleanApiKey);
   
   const targetCurrency = getTargetCurrency(targetLanguage);
   
   // 2. 優化 Prompt - 針對 Gemini 2.5 Flash Lite 的指令
-  // 特別強調 OCR 準確度 (解決金菊變金菇) 和 雙價格合併邏輯
   const prompt = `
     Analyze ${base64Images.length} menu image(s).
     
@@ -79,9 +80,9 @@ export const parseMenuImage = async (
   }));
 
   try {
-    // 3. 呼叫模型 - 明確指定 gemini-2.5-flash-lite
+    // 3. 呼叫模型 - 指定 gemini-2.5-flash-lite
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite", // ⚡️ 這裡明確指定了 Lite 模型
+      model: "gemini-2.5-flash-lite", // ⚡️ 指定 Lite 模型
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: menuSchema,
@@ -110,7 +111,7 @@ export const parseMenuImage = async (
       category: item.category || 'General',
       allergy_warning: item.allergy_warning || false,
       dietary_tags: item.dietary_tags || [],
-      options: item.options || [], // 確保 options 不為 undefined
+      options: item.options || [], // 確保 options 存在
       description: item.description || ''
     }));
 
@@ -136,7 +137,7 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  // ⚡️ 這裡也明確指定使用 gemini-2.5-flash-lite
+  // ⚡️ 指定 Lite 模型
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
   
   const prompt = `Explain "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
