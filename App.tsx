@@ -183,8 +183,7 @@ const App: React.FC = () => {
     if (!menuData || Object.keys(cart).length === 0) return;
 
     const cartItems = Object.values(cart) as CartItem[];
-    const totalOriginal = cartItems.reduce((sum, i) => sum + (i.item.price * i.quantity), 0);
-
+    const total = cart.reduce((sum, cartItem) => sum + cartItem.price * cartItem.quantity, 0);
     const newRecord: HistoryRecord = {
         id: Date.now().toString(),
         timestamp: Date.now(),
@@ -284,7 +283,6 @@ const App: React.FC = () => {
             {appState === 'ordering' && menuData && (
               <motion.div key="ordering" {...pageVariants} className="h-full">
                   <OrderingPage 
-                    apiKey={apiKey}
                     menuData={menuData}
                     cart={cart}
                     targetLang={targetLanguage}
