@@ -1,12 +1,18 @@
+// components/OrderingPage.tsx
+
 import React, { useState } from 'react';
-// 1. 引入我們剛定義好的型別
+
+// 修改這裡：從 './types' 改為 '../types'
+// 注意：我也補上了 CartItem 或是其他你可能需要的舊型別
 import { 
   MenuItem, 
   OrderItem, 
   AIModelId, 
   MenuAnalysisRequest,
   MenuAnalysisResponse 
-} from './types';
+} from '../types'; 
+
+// ... (後面的程式碼保持不變)
 
 // 模擬一些菜單資料 (實際專案可能是從 API 撈取)
 const MOCK_MENU: MenuItem[] = [
