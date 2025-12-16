@@ -1,4 +1,19 @@
-import { TargetLanguage } from './types';
+// constants.ts
+
+// 1. 我們在這裡直接定義 TargetLanguage 為常數物件 (解決 "only refers to a type" 錯誤)
+export const TargetLanguage = {
+  ChineseTW: 'ChineseTW',
+  English: 'English',
+  Korean: 'Korean',
+  French: 'French',
+  Spanish: 'Spanish',
+  Thai: 'Thai',
+  Filipino: 'Filipino',
+  Vietnamese: 'Vietnamese',
+} as const;
+
+// 2. 同時導出型別，讓其他檔案也能用 (例如: lang: TargetLanguage)
+export type TargetLanguage = typeof TargetLanguage[keyof typeof TargetLanguage];
 
 export const GUMROAD_PRODUCT_PERMALINK = 'ihrnvp';
 
