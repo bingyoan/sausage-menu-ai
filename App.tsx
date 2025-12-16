@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppState, TargetLanguage, MenuData, Cart, CartItem, HistoryRecord } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { MenuProcessing } from './components/MenuProcessing';
-import { OrderingPage } from './components/OrderingPage';
+import OrderingPage from './components/OrderingPage';
 import { OrderSummary } from './components/OrderSummary';
 import { HistoryPage } from './components/HistoryPage';
 import { SettingsModal } from './components/SettingsModal';
