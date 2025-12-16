@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Camera, Upload, Globe, History, Settings, CheckCircle, Lock } from 'lucide-react';
-// 修正這裡：TargetLanguage 和 LANGUAGE_OPTIONS 現在都在 constants 裡
+// 修正：指向 ../constants
 import { TargetLanguage, LANGUAGE_OPTIONS } from '../constants';
 import { SausageDogLogo, PawPrint } from './DachshundAssets';
 
@@ -58,7 +58,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-20 space-y-8">
-        
         {/* Branding */}
         <div className="z-10 text-center">
             <div className="animate-bounce-slow inline-block">
