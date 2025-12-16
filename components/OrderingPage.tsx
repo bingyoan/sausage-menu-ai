@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 
-// 修改這裡：從 './types' 改為 '../types'
-// 注意：我也補上了 CartItem 或是其他你可能需要的舊型別
+// 修改這裡：指向 ../types
 import { 
   MenuItem, 
   OrderItem, 
   AIModelId, 
-  MenuAnalysisRequest,
+  MenuAnalysisRequest, 
   MenuAnalysisResponse 
 } from '../types'; 
-
-// ... (後面的程式碼保持不變)
 
 // 模擬一些菜單資料 (實際專案可能是從 API 撈取)
 const MOCK_MENU: MenuItem[] = [
@@ -22,10 +19,10 @@ const MOCK_MENU: MenuItem[] = [
 const OrderingPage: React.FC = () => {
   // --- State 管理 ---
   const [cart, setCart] = useState<OrderItem[]>([]);
-  
+   
   // 2. 設定預設模型為 gemini-2.5-flash-lite
   const [selectedModel] = useState<AIModelId>('gemini-2.5-flash-lite');
-  
+   
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
