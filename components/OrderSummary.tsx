@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Home, Share2, Users, Download } from 'lucide-react';
-import { Cart, MenuData, CartItem } from '../types';
-import { SausageDogLogo } from './DachshundAssets';
+import { X, Home, Users, Download } from 'lucide-react';
+import { Cart, MenuData } from '../types'; // 修正引用
+import { SausageDogLogo } from './DachshundAssets'; // 確保你有這個檔案，若無可先註解掉
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 
@@ -14,10 +14,16 @@ interface OrderSummaryProps {
 
 export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onClose, onFinish }) => {
   const [personCount, setPersonCount] = useState(1);
-  const cartItems = Object.values(cart) as CartItem[];
   
-  const totalPrice = cartItems.reduce((sum, i) => sum + (i.item.price * i.quantity), 0);
-  const totalConverted = totalPrice * menuData.exchangeRate;
+  // 1. 修正：Cart 已經是陣列，不需要 Object.values
+  const cartItems = cart;
+  
+  // 2. 修正：直接存取 price (移除 .item)
+  const totalPrice = cartItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+  
+  // 3. 修正：處理 exchangeRate 可能 undefined 的情況
+  const exchangeRate = menuData.exchangeRate || 1;
+  const totalConverted = totalPrice * exchangeRate;
 
   const handleShare = async () => {
       const element = document.getElementById('receipt-view');
@@ -25,17 +31,15 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
       
       const toastId = toast.loading('Generating receipt...');
       try {
-          // Temporarily remove rounded corners and shadow for cleaner capture
           element.style.borderRadius = '0';
           const canvas = await html2canvas(element, { 
               scale: 2,
-              backgroundColor: '#fff7ed', // sausage-50
+              backgroundColor: '#fff7ed', 
           });
-          element.style.borderRadius = '1.5rem'; // Restore
+          element.style.borderRadius = '1.5rem'; 
 
           const image = canvas.toDataURL('image/png');
           
-          // Create download link
           const link = document.createElement('a');
           link.href = image;
           link.download = `SausageMenu_${Date.now()}.png`;
@@ -63,7 +67,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4">
           
-          {/* RECEIPT CARD - Target for html2canvas */}
+          {/* RECEIPT CARD */}
           <div id="receipt-view" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 relative overflow-hidden mb-6">
              {/* Receipt Sawtooth Top */}
              <div className="absolute top-0 left-0 right-0 h-2 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:16px_16px] rotate-180 -mt-1"></div>
@@ -75,17 +79,19 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
              </div>
 
              <div className="space-y-4 mb-6">
-                {cartItems.map(({ item, quantity }) => (
-                    <div key={item.id} className="flex justify-between items-start text-sm">
+                {/* 4. 修正：將 s 改為 cartItems，並修正屬性存取 */}
+                {cartItems.map((cartItem) => (
+                    <div key={cartItem.id} className="flex justify-between items-start text-sm">
                         <div className="flex gap-3">
-                            <span className="font-bold text-sausage-600">x{quantity}</span>
+                            <span className="font-bold text-sausage-600">x{cartItem.quantity}</span>
                             <div>
-                                <p className="font-bold text-gray-800 leading-tight">{item.translatedName}</p>
-                                <p className="text-xs text-gray-400">{item.originalName}</p>
+                                {/* 5. 修正：使用正確的屬性 name，備用文字改為 category */}
+                                <p className="font-bold text-gray-800 leading-tight">{cartItem.name}</p>
+                                <p className="text-xs text-gray-400">{cartItem.category}</p>
                             </div>
                         </div>
                         <span className="font-mono text-gray-600 font-bold whitespace-nowrap">
-                            {(item.price * quantity).toFixed(0)}
+                            {(cartItem.price * cartItem.quantity).toFixed(0)}
                         </span>
                     </div>
                 ))}
@@ -93,16 +99,16 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
 
              <div className="border-t-2 border-black pt-4">
                  <div className="flex justify-between items-end mb-1">
-                     <span className="font-bold text-gray-500 uppercase text-xs">Total ({menuData.originalCurrency})</span>
+                     <span className="font-bold text-gray-500 uppercase text-xs">Total ({menuData.originalCurrency || 'Origin'})</span>
                      <span className="font-black text-2xl text-gray-900">{totalPrice}</span>
                  </div>
                  <div className="flex justify-between items-center">
-                     <span className="font-bold text-gray-400 uppercase text-xs">Est. ({menuData.targetCurrency})</span>
+                     <span className="font-bold text-gray-400 uppercase text-xs">Est. ({menuData.targetCurrency || 'Target'})</span>
                      <span className="font-bold text-sausage-600">≈ {totalConverted.toFixed(0)}</span>
                  </div>
              </div>
              
-             {/* Split Bill Result on Receipt */}
+             {/* Split Bill Result */}
              {personCount > 1 && (
                 <div className="mt-4 pt-3 border-t border-dashed border-gray-200 flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                     <span className="text-xs font-bold text-gray-500">Split ({personCount})</span>
