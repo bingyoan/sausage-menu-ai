@@ -1,5 +1,3 @@
-// components/OrderingPage.tsx
-
 import React, { useState } from 'react';
 
 // 修改這裡：從 './types' 改為 '../types'
