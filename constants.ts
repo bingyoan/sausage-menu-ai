@@ -1,6 +1,6 @@
 // constants.ts
 
-// 1. 我們在這裡直接定義 TargetLanguage 為常數物件 (解決 "only refers to a type" 錯誤)
+// 使用 const object 來模擬 Enum，同時支援數值與型別
 export const TargetLanguage = {
   ChineseTW: 'ChineseTW',
   English: 'English',
@@ -12,7 +12,7 @@ export const TargetLanguage = {
   Vietnamese: 'Vietnamese',
 } as const;
 
-// 2. 同時導出型別，讓其他檔案也能用 (例如: lang: TargetLanguage)
+// 導出型別
 export type TargetLanguage = typeof TargetLanguage[keyof typeof TargetLanguage];
 
 export const GUMROAD_PRODUCT_PERMALINK = 'ihrnvp';
