@@ -3,10 +3,7 @@ import { MenuData, TargetLanguage } from '../types';
 import { getTargetCurrency } from '../constants';
 import { fetchExchangeRate } from './currencyService';
 
-// ⚡️ 鎖定使用您指定的 Flash Lite 模型
-const MODEL_NAME = "gemini-2.5-flash-lite";
-
-// 定義 JSON 輸出的結構
+// 1. 修改資料結構 (Schema) - 為了支援雙價格 (例如: 正常 $120 / 雙倍肉 $190)
 const menuSchema = {
   type: SchemaType.OBJECT,
   properties: {
@@ -20,11 +17,22 @@ const menuSchema = {
         properties: {
           originalName: { type: SchemaType.STRING },
           translatedName: { type: SchemaType.STRING },
-          price: { type: SchemaType.NUMBER },
+          price: { type: SchemaType.NUMBER }, // 主價格 (低價)
           category: { type: SchemaType.STRING },
           allergy_warning: { type: SchemaType.BOOLEAN },
+          description: { type: SchemaType.STRING },
+          // 這裡儲存變體選項 (如：雙倍肉、加大)
+          options: {
+            type: SchemaType.ARRAY,
+            items: {
+              type: SchemaType.OBJECT,
+              properties: {
+                name: { type: SchemaType.STRING }, // e.g., "雙倍肉"
+                price: { type: SchemaType.NUMBER } // e.g., 190
+              }
+            }
+          },
           dietary_tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          description: { type: SchemaType.STRING }
         },
         required: ["originalName", "translatedName", "price", "allergy_warning"],
       },
@@ -38,44 +46,54 @@ export const parseMenuImage = async (
   base64Images: string[], 
   targetLanguage: TargetLanguage
 ): Promise<MenuData> => {
-  // 1. 清理 API Key
   const cleanApiKey = apiKey.replace(/[^\x20-\x7E]/g, '').trim();
   const genAI = new GoogleGenerativeAI(cleanApiKey);
   
   const targetCurrency = getTargetCurrency(targetLanguage);
   
-  // 2. 準備 Prompt
+  // 2. 優化 Prompt - 針對 Gemini 2.5 Flash Lite 的指令
+  // 特別強調 OCR 準確度 (解決金菊變金菇) 和 雙價格合併邏輯
   const prompt = `
     Analyze ${base64Images.length} menu image(s).
-    Extract items, translate to ${targetLanguage}.
-    Detect Currency & Exchange Rate to ${targetCurrency}.
-    Price: use TAX-INCLUSIVE.
-    Return SINGLE JSON.
+    
+    TASK 1: OCR ACCURACY (CRITICAL)
+    - STRICTLY transcribe text exactly as seen in the image.
+    - DO NOT autocorrect names based on common food items.
+    - Example: If image says "金菊", output "金菊", NOT "金菇".
+    
+    TASK 2: DUAL PRICING HANDLING
+    - Items often have two prices (e.g., $120 regular / $190 double meat).
+    - DO NOT create two separate items. Combine them into ONE item.
+    - 'price': use the lower/regular price (e.g., 120).
+    - 'options': put the higher price variant here (name: "雙倍肉", price: 190).
+    
+    TASK 3: TRANSLATION
+    - Translate item names to ${targetLanguage}.
+    - Detect Currency and calculate Exchange Rate to ${targetCurrency}.
+    
+    Return pure JSON.
   `;
 
-  // 3. 準備圖片資料
   const imageParts = base64Images.map(img => ({
     inlineData: { data: img, mimeType: "image/jpeg" }
   }));
 
   try {
-    // 4. 建立模型實例 (使用 generationConfig)
+    // 3. 呼叫模型 - 明確指定 gemini-2.5-flash-lite
     const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
+      model: "gemini-2.5-flash-lite", // ⚡️ 這裡明確指定了 Lite 模型
       generationConfig: { 
         responseMimeType: "application/json",
         responseSchema: menuSchema,
       },
     });
     
-    // 5. 發送請求
     const result = await model.generateContent([prompt, ...imageParts]);
     const response = await result.response;
     const text = response.text();
     
     if (!text) throw new Error("No response from AI");
 
-    // 6. 解析 JSON (移除可能的 Markdown 標記)
     const textToParse = text.startsWith('```json') 
       ? text.replace(/^```json\s*/, '').replace(/\s*```$/, '') 
       : text;
@@ -92,6 +110,7 @@ export const parseMenuImage = async (
       category: item.category || 'General',
       allergy_warning: item.allergy_warning || false,
       dietary_tags: item.dietary_tags || [],
+      options: item.options || [], // 確保 options 不為 undefined
       description: item.description || ''
     }));
 
@@ -105,7 +124,7 @@ export const parseMenuImage = async (
 
   } catch (error) {
     console.error("Gemini Error:", error);
-    alert("菜單解析失敗。請確認 API Key 是否正確，或圖片是否清晰。");
+    alert("菜單解析失敗。請確認 API Key 是否正確。");
     throw error;
   }
 };
@@ -117,7 +136,8 @@ export const explainDish = async (
   targetLang: TargetLanguage
 ): Promise<string> => {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+  // ⚡️ 這裡也明確指定使用 gemini-2.5-flash-lite
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
   
   const prompt = `Explain "${dishName}" (${originalLang}) in ${targetLang}. 1 short sentence.`;
   
