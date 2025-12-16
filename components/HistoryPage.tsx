@@ -46,8 +46,16 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onDel
               <div className="space-y-2 mb-3">
                 {record.items.map((cartItem, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
-                        {/* 修正：cartItem 結構已扁平化，直接使用 .name */}
-                        <span className="text-gray-700 truncate max-w-[70%]">{cartItem.name}</span>
+                        {/* 修正：使用扁平化屬性 .name 或 .originalName */}
+                        <div className="flex flex-col">
+                            <span className="text-gray-800 font-medium truncate max-w-[200px]">
+                                {cartItem.name}
+                            </span>
+                            {/* 如果有名稱不同，顯示原文 */}
+                            {cartItem.originalName && cartItem.originalName !== cartItem.name && (
+                                <span className="text-xs text-gray-400">{cartItem.originalName}</span>
+                            )}
+                        </div>
                         <span className="text-sausage-800 font-bold">x{cartItem.quantity}</span>
                     </div>
                 ))}
