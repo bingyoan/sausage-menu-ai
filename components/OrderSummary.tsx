@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Home, Users, Download } from 'lucide-react';
 import { Cart, MenuData } from '../types'; // 修正引用
-import { SausageDogLogo } from './DachshundAssets'; // 確保你有這個檔案，若無可先註解掉
+import { SausageDogLogo } from './DachshundAssets';
 import html2canvas from 'html2canvas';
 import toast from 'react-hot-toast';
 
@@ -15,13 +15,11 @@ interface OrderSummaryProps {
 export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onClose, onFinish }) => {
   const [personCount, setPersonCount] = useState(1);
   
-  // 1. 修正：Cart 已經是陣列，不需要 Object.values
+  // Cart 已經是陣列
   const cartItems = cart;
   
-  // 2. 修正：直接存取 price (移除 .item)
+  // 直接存取 price (扁平化)
   const totalPrice = cartItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-  
-  // 3. 修正：處理 exchangeRate 可能 undefined 的情況
   const exchangeRate = menuData.exchangeRate || 1;
   const totalConverted = totalPrice * exchangeRate;
 
@@ -39,7 +37,6 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
           element.style.borderRadius = '1.5rem'; 
 
           const image = canvas.toDataURL('image/png');
-          
           const link = document.createElement('a');
           link.href = image;
           link.download = `SausageMenu_${Date.now()}.png`;
@@ -55,8 +52,6 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
   return (
     <div className="fixed inset-0 bg-sausage-900 z-50 flex flex-col">
       <div className="bg-gray-100 flex-1 flex flex-col overflow-hidden m-2 mb-0 rounded-t-3xl">
-        
-        {/* Header */}
         <div className="p-4 bg-white flex justify-between items-center shadow-sm z-10">
           <h2 className="text-xl font-black text-sausage-900">Your Order</h2>
           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
@@ -64,12 +59,8 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
           </button>
         </div>
 
-        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          
-          {/* RECEIPT CARD */}
           <div id="receipt-view" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 relative overflow-hidden mb-6">
-             {/* Receipt Sawtooth Top */}
              <div className="absolute top-0 left-0 right-0 h-2 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:16px_16px] rotate-180 -mt-1"></div>
 
              <div className="flex flex-col items-center mb-6 border-b-2 border-dashed border-gray-200 pb-4">
@@ -79,13 +70,11 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
              </div>
 
              <div className="space-y-4 mb-6">
-                {/* 4. 修正：將 s 改為 cartItems，並修正屬性存取 */}
                 {cartItems.map((cartItem) => (
                     <div key={cartItem.id} className="flex justify-between items-start text-sm">
                         <div className="flex gap-3">
                             <span className="font-bold text-sausage-600">x{cartItem.quantity}</span>
                             <div>
-                                {/* 5. 修正：使用正確的屬性 name，備用文字改為 category */}
                                 <p className="font-bold text-gray-800 leading-tight">{cartItem.name}</p>
                                 <p className="text-xs text-gray-400">{cartItem.category}</p>
                             </div>
@@ -108,7 +97,6 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
                  </div>
              </div>
              
-             {/* Split Bill Result */}
              {personCount > 1 && (
                 <div className="mt-4 pt-3 border-t border-dashed border-gray-200 flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                     <span className="text-xs font-bold text-gray-500">Split ({personCount})</span>
@@ -117,12 +105,9 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
                     </span>
                 </div>
              )}
-
-             {/* Receipt Sawtooth Bottom */}
              <div className="absolute bottom-0 left-0 right-0 h-2 bg-[radial-gradient(circle,transparent_50%,#fff_50%)] bg-[length:16px_16px] mb-[-4px]"></div>
           </div>
 
-          {/* Split Bill Calculator */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6">
               <div className="flex items-center gap-2 mb-3 text-sausage-800 font-bold">
                   <Users size={18} /> Split Bill
@@ -143,10 +128,8 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ cart, menuData, onCl
                   </button>
               </div>
           </div>
-
         </div>
 
-        {/* Footer Actions */}
         <div className="bg-white p-4 border-t border-gray-200 grid grid-cols-2 gap-3 safe-area-bottom">
           <button 
             onClick={handleShare}
