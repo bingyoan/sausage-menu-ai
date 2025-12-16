@@ -1,86 +1,41 @@
-// src/types.ts
+// types.ts
 
-// ==========================================
-// 1. 舊有的定義 (為了修復其他頁面的報錯)
-// ==========================================
-
-// 根據你的錯誤訊息推斷的舊有型別
-export type TargetLanguage = 'en' | 'zh' | 'jp' | 'ko'; // 範例語言，可自行增減
-
-// 為了相容舊程式碼，我們讓 MenuData 等同於新的 MenuItem 陣列，或是原本的結構
+// 1. 修正 MenuData，加入匯率相關欄位
 export interface MenuData {
   items: MenuItem[];
-  categories: string[];
+  // 新增以下欄位解決 OrderSummary 和 geminiService 的錯誤
+  originalCurrency?: string;
+  targetCurrency?: string;
+  exchangeRate?: number;
 }
 
-// 購物車項目 (相容舊版)
-export interface CartItem extends MenuItem {
-  quantity: number;
-  notes?: string;
-}
-
-// 購物車型別
-export type Cart = CartItem[];
-
-// 歷史紀錄
+// 2. 修正 HistoryRecord，補上缺少的欄位
 export interface HistoryRecord {
   id: string;
-  date: string;
-  summary: string;
-  total: number;
+  // 新增以下欄位解決 HistoryPage 的錯誤
+  timestamp: number;        // 用於顯示時間
+  items: CartItem[];        // 歷史訂單內容
+  totalOriginalPrice: number;
+  currency: string;
+  summary?: string;         // AI 生成的摘要 (如果有)
 }
 
-// App 全域狀態
-export interface AppState {
-  cart: Cart;
-  history: HistoryRecord[];
-  language: TargetLanguage;
-}
-
-// ==========================================
-// 2. 新增的 AI 與點餐定義 (我們剛寫的)
-// ==========================================
-
-// AI 模型相關設定
-export type AIModelId = 'gemini-2.5-flash-lite' | 'gemini-1.5-flash' | 'gemini-1.5-pro';
-
-export interface AIConfig {
-  model: AIModelId;
-  temperature?: number;
-  maxOutputTokens?: number;
-}
-
-// 菜單單項
+// 3. 確保 CartItem 結構正確
+// 根據之前的 OrderingPage，CartItem 應該是 MenuItem + quantity (扁平結構)
 export interface MenuItem {
   id: string;
   name: string;
   price: number;
-  description?: string;
   category: string;
-  imageUrl?: string; 
-  aiTags?: string[]; 
+  description?: string;
+  aiTags?: string[];
 }
 
-// 訂單項目 (這跟上面的 CartItem 很像，可以考慮之後合併，現在先保留以防萬一)
-export interface OrderItem extends MenuItem {
+export interface CartItem extends MenuItem {
   quantity: number;
-  notes?: string;
 }
 
-// API 請求結構
-export interface MenuAnalysisRequest {
-  model: AIModelId;
-  prompt: string;
-  menuContext?: MenuItem[]; 
-}
-
-// API 回應結構
-export interface MenuAnalysisResponse {
-  success: boolean;
-  data?: {
-    suggestion: string;
-    recommendedPairings?: string[];
-    estimatedWaitTime?: string;
-  };
-  error?: string;
-}
+// 4. 定義 AppState (解決 App.tsx 錯誤)
+// 如果你只是用字串切換頁面，可以直接定義為字串聯集
+export type AppState = 'ordering' | 'history' | 'settings'; 
+// 或者如果你原本是 enum，請確保用 enum
