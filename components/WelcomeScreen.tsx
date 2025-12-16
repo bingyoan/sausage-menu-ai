@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Camera, Upload, Globe, History, Settings, CheckCircle, Lock } from 'lucide-react';
-import { TargetLanguage } from '../types';
-import { LANGUAGE_OPTIONS } from '../constants';
+// 修正這裡：TargetLanguage 和 LANGUAGE_OPTIONS 現在都在 constants 裡
+import { TargetLanguage, LANGUAGE_OPTIONS } from '../constants';
 import { SausageDogLogo, PawPrint } from './DachshundAssets';
 
 interface WelcomeScreenProps {
