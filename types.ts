@@ -1,59 +1,85 @@
-// types.ts
+// src/types.ts
 
-// --- AI 模型相關設定 ---
+// ==========================================
+// 1. 舊有的定義 (為了修復其他頁面的報錯)
+// ==========================================
 
-// 定義支援的 AI 模型 ID，這裡強制包含你指定的 2.5 flash lite
+// 根據你的錯誤訊息推斷的舊有型別
+export type TargetLanguage = 'en' | 'zh' | 'jp' | 'ko'; // 範例語言，可自行增減
+
+// 為了相容舊程式碼，我們讓 MenuData 等同於新的 MenuItem 陣列，或是原本的結構
+export interface MenuData {
+  items: MenuItem[];
+  categories: string[];
+}
+
+// 購物車項目 (相容舊版)
+export interface CartItem extends MenuItem {
+  quantity: number;
+  notes?: string;
+}
+
+// 購物車型別
+export type Cart = CartItem[];
+
+// 歷史紀錄
+export interface HistoryRecord {
+  id: string;
+  date: string;
+  summary: string;
+  total: number;
+}
+
+// App 全域狀態
+export interface AppState {
+  cart: Cart;
+  history: HistoryRecord[];
+  language: TargetLanguage;
+}
+
+// ==========================================
+// 2. 新增的 AI 與點餐定義 (我們剛寫的)
+// ==========================================
+
+// AI 模型相關設定
 export type AIModelId = 'gemini-2.5-flash-lite' | 'gemini-1.5-flash' | 'gemini-1.5-pro';
 
 export interface AIConfig {
-  model: AIModelId; // 預設將會使用 'gemini-2.5-flash-lite'
+  model: AIModelId;
   temperature?: number;
   maxOutputTokens?: number;
 }
 
-// --- 菜單與訂單相關 ---
-
+// 菜單單項
 export interface MenuItem {
   id: string;
   name: string;
   price: number;
   description?: string;
   category: string;
-  // 如果有圖片生成的欄位
   imageUrl?: string; 
-  // 如果有 AI 分析後的標籤（例如：推薦指數、口味分析）
   aiTags?: string[]; 
 }
 
+// 訂單項目 (這跟上面的 CartItem 很像，可以考慮之後合併，現在先保留以防萬一)
 export interface OrderItem extends MenuItem {
   quantity: number;
-  notes?: string; // 客製化備註
+  notes?: string;
 }
 
-export interface Order {
-  orderId: string;
-  items: OrderItem[];
-  totalAmount: number;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
-  createdAt: string; // ISO string
-}
-
-// --- API 請求與回應 (針對 AI 功能) ---
-
-// 這是發送給後端/API 的請求結構
+// API 請求結構
 export interface MenuAnalysisRequest {
   model: AIModelId;
   prompt: string;
-  // 可以加入當前的菜單內容供 AI 參考
   menuContext?: MenuItem[]; 
 }
 
-// 這是 AI 回傳的結構 (假設我們讓它回傳 JSON 或特定格式)
+// API 回應結構
 export interface MenuAnalysisResponse {
   success: boolean;
   data?: {
     suggestion: string;
-    recommendedPairings?: string[]; // 推薦搭配
+    recommendedPairings?: string[];
     estimatedWaitTime?: string;
   };
   error?: string;
