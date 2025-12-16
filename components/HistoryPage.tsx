@@ -12,10 +12,8 @@ interface HistoryPageProps {
 export const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onDelete }) => {
   return (
     <div className="flex flex-col h-full bg-sausage-50 relative overflow-hidden">
-      {/* Background */}
       <PawPrint className="absolute top-20 right-[-20px] w-40 h-40 text-sausage-100 opacity-50 rotate-12" />
 
-      {/* Header */}
       <div className="bg-white shadow-sm px-4 py-3 flex items-center gap-4 sticky top-0 z-20">
         <button onClick={onBack} className="p-2 text-sausage-800 hover:bg-sausage-50 rounded-full">
           <ArrowLeft size={24} />
@@ -23,7 +21,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onDel
         <h2 className="font-black text-sausage-900 text-xl">Order History</h2>
       </div>
 
-      {/* List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {history.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-sausage-400 opacity-70">
@@ -49,7 +46,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ history, onBack, onDel
               <div className="space-y-2 mb-3">
                 {record.items.map((cartItem, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-gray-700 truncate max-w-[70%]">{cartItem.item.originalName}</span>
+                        {/* 修正：cartItem 結構已扁平化，直接使用 .name */}
+                        <span className="text-gray-700 truncate max-w-[70%]">{cartItem.name}</span>
                         <span className="text-sausage-800 font-bold">x{cartItem.quantity}</span>
                     </div>
                 ))}
