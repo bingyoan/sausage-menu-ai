@@ -1,156 +1,204 @@
 import React, { useState } from 'react';
-
-// 修改這裡：指向 ../types
+import { ArrowLeft, ShoppingCart, Sparkles } from 'lucide-react';
 import { 
   MenuItem, 
-  OrderItem, 
+  MenuData, 
+  Cart, 
   AIModelId, 
   MenuAnalysisRequest, 
-  MenuAnalysisResponse 
+  MenuAnalysisResponse,
+  TargetLanguage
 } from '../types'; 
 
-// 模擬一些菜單資料 (實際專案可能是從 API 撈取)
-const MOCK_MENU: MenuItem[] = [
-  { id: '1', name: '經典牛肉堡', price: 150, category: 'Main', aiTags: ['高蛋白'] },
-  { id: '2', name: '松露薯條', price: 80, category: 'Side', aiTags: ['熱銷', '素食可'] },
-  { id: '3', name: '冰檸檬茶', price: 50, category: 'Drink' },
-];
+// 1. 定義 Props 介面 (解決 App.tsx 的錯誤)
+interface OrderingPageProps {
+  menuData: MenuData;
+  cart: Cart;
+  onUpdateCart: (itemId: string, delta: number) => void;
+  onViewSummary: () => void;
+  onBack: () => void;
+  targetLang: TargetLanguage;
+}
 
-const OrderingPage: React.FC = () => {
-  // --- State 管理 ---
-  const [cart, setCart] = useState<OrderItem[]>([]);
-   
-  // 2. 設定預設模型為 gemini-2.5-flash-lite
+const OrderingPage: React.FC<OrderingPageProps> = ({
+  menuData,
+  cart,
+  onUpdateCart,
+  onViewSummary,
+  onBack,
+  targetLang
+}) => {
+  // 2. 移除內部 cart state，改用 props.cart
+  
   const [selectedModel] = useState<AIModelId>('gemini-2.5-flash-lite');
-   
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // --- 處理加入購物車邏輯 (簡化版) ---
-  const addToCart = (item: MenuItem) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      }
-      return [...prev, { ...item, quantity: 1 }];
-    });
+  // 計算購物車總數量
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  // 取得該項目的數量
+  const getItemQuantity = (id: string) => {
+    return cart.find(i => i.id === id)?.quantity || 0;
   };
 
-  // --- 3. 核心功能：呼叫 Gemini 2.5 Flash Lite ---
   const handleAskAI = async () => {
     setIsAiLoading(true);
     setAiSuggestion(null);
 
     try {
-      // 準備發送給後端的資料結構
       const requestPayload: MenuAnalysisRequest = {
-        model: selectedModel, // 這裡確保是用 gemini-2.5-flash-lite
-        prompt: "根據我目前的購物車內容，推薦一杯適合的飲料，並說明原因。",
-        menuContext: MOCK_MENU, // 讓 AI 知道有哪些菜可以選
+        model: selectedModel,
+        prompt: `我是用${targetLang}的顧客。根據我目前的購物車內容，推薦一杯適合的飲料或是配菜，並用一句話說明原因。`,
+        menuContext: menuData.items,
       };
 
       console.log('正在呼叫模型:', requestPayload.model);
-
-      // --- 模擬 API 呼叫 (這裡之後會替換成真實的 fetch/axios) ---
-      // const response = await fetch('/api/analyze-order', { ... });
       
-      // 這裡先模擬 AI 的回應
+      // 模擬 API 延遲
       await new Promise(resolve => setTimeout(resolve, 1500)); 
       
+      // 這裡簡單模擬回應，實際應呼叫 geminiService
       const mockResponse: MenuAnalysisResponse = {
         success: true,
         data: {
-          suggestion: `使用模型 (${selectedModel}) 分析：既然您點了經典牛肉堡，推薦搭配「冰檸檬茶」來解膩，清爽的口感能平衡漢堡的油脂。`,
-          recommendedPairings: ['冰檸檬茶']
+          suggestion: `(AI 模型 ${selectedModel}) 推薦：試試看這家店的招牌飲料，可以平衡口感！`,
+          recommendedPairings: []
         }
       };
-      // -----------------------------------------------------------
 
       if (mockResponse.success && mockResponse.data) {
         setAiSuggestion(mockResponse.data.suggestion);
       }
-
     } catch (error) {
       console.error("AI Analysis failed", error);
-      setAiSuggestion("抱歉，AI 目前忙線中，請稍後再試。");
+      setAiSuggestion("抱歉，AI 目前忙線中。");
     } finally {
       setIsAiLoading(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <header className="mb-6 border-b pb-4">
-        <h1 className="text-2xl font-bold">智慧點餐系統</h1>
-        <p className="text-sm text-gray-500">
-          目前 AI 模型: <span className="font-mono bg-gray-100 px-1 rounded">{selectedModel}</span>
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* 左側：菜單列表 */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">菜單</h2>
-          <ul className="space-y-4">
-            {MOCK_MENU.map(item => (
-              <li key={item.id} className="flex justify-between items-center border p-3 rounded hover:bg-gray-50">
-                <div>
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-sm text-gray-500">${item.price}</div>
-                </div>
-                <button 
-                  onClick={() => addToCart(item)}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                >
-                  加入
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* 右側：購物車與 AI 建議 */}
-        <div className="bg-gray-50 p-4 rounded-lg h-fit">
-          <h2 className="text-xl font-semibold mb-4">您的訂單</h2>
-          {cart.length === 0 ? (
-            <p className="text-gray-400">購物車是空的</p>
-          ) : (
-            <ul className="space-y-2 mb-6">
-              {cart.map(item => (
-                <li key={item.id} className="flex justify-between text-sm">
-                  <span>{item.name} x {item.quantity}</span>
-                  <span>${item.price * item.quantity}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <hr className="my-4"/>
-
-          {/* AI 功能區塊 */}
-          <div className="mt-4">
-            <button
-              onClick={handleAskAI}
-              disabled={isAiLoading || cart.length === 0}
-              className={`w-full py-2 rounded font-medium transition-colors ${
-                isAiLoading || cart.length === 0
-                  ? 'bg-gray-300 cursor-not-allowed' 
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
-            >
-              {isAiLoading ? 'AI 正在思考中...' : '🔮 請 AI 推薦搭配飲料'}
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header */}
+      <div className="bg-white px-4 py-3 shadow-sm sticky top-0 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+            <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-100 text-gray-600">
+                <ArrowLeft size={20} />
             </button>
-
-            {aiSuggestion && (
-              <div className="mt-4 p-3 bg-purple-100 text-purple-900 rounded border border-purple-200 text-sm animate-fade-in">
-                <strong>💡 建議：</strong>
-                <p className="mt-1">{aiSuggestion}</p>
-              </div>
-            )}
-          </div>
+            <div>
+                <h1 className="font-bold text-gray-900 leading-tight">Menu</h1>
+                <p className="text-xs text-gray-500">
+                    {menuData.items.length} items • {menuData.originalCurrency}
+                </p>
+            </div>
+        </div>
+        <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-500">
+            {selectedModel}
         </div>
       </div>
+
+      {/* Menu List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
+        {menuData.items.map(item => {
+            const qty = getItemQuantity(item.id);
+            return (
+              <div key={item.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col gap-3">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="font-bold text-lg text-gray-900">{item.name}</h3>
+                        {/* 顯示原文名稱 */}
+                        {item.originalName && item.originalName !== item.name && (
+                            <p className="text-sm text-gray-400">{item.originalName}</p>
+                        )}
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                    </div>
+                    <span className="font-bold text-lg text-sausage-700 whitespace-nowrap">
+                        {item.price} <span className="text-xs">{menuData.originalCurrency}</span>
+                    </span>
+                </div>
+
+                {/* Tags */}
+                {item.aiTags && item.aiTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                        {item.aiTags.map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-full font-medium">
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                {/* Controls */}
+                <div className="flex justify-between items-center mt-2">
+                    <button 
+                        onClick={handleAskAI}
+                        className="text-xs flex items-center gap-1 text-purple-600 font-bold px-2 py-1 bg-purple-50 rounded-lg hover:bg-purple-100"
+                    >
+                        <Sparkles size={12} /> AI Insight
+                    </button>
+
+                    {qty === 0 ? (
+                        <button 
+                            onClick={() => onUpdateCart(item.id, 1)}
+                            className="bg-sausage-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-sausage-700 shadow-sm"
+                        >
+                            Add
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
+                            <button 
+                                onClick={() => onUpdateCart(item.id, -1)}
+                                className="w-8 h-8 flex items-center justify-center bg-white rounded shadow-sm font-bold text-gray-600 active:scale-95"
+                            >
+                                -
+                            </button>
+                            <span className="font-bold text-gray-900 w-4 text-center">{qty}</span>
+                            <button 
+                                onClick={() => onUpdateCart(item.id, 1)}
+                                className="w-8 h-8 flex items-center justify-center bg-sausage-600 text-white rounded shadow-sm font-bold active:scale-95"
+                            >
+                                +
+                            </button>
+                        </div>
+                    )}
+                </div>
+              </div>
+            );
+        })}
+      </div>
+
+      {/* AI Suggestion Popup */}
+      {aiSuggestion && (
+        <div className="fixed bottom-20 left-4 right-4 bg-purple-900 text-white p-4 rounded-xl shadow-xl z-20 animate-fade-in-up">
+            <div className="flex justify-between items-start mb-1">
+                <h4 className="font-bold flex items-center gap-2"><Sparkles size={16} /> AI Suggestion</h4>
+                <button onClick={() => setAiSuggestion(null)} className="text-purple-300 hover:text-white">✕</button>
+            </div>
+            <p className="text-sm text-purple-100">{aiSuggestion}</p>
+        </div>
+      )}
+
+      {/* Floating Cart Button */}
+      {totalItems > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-30">
+            <button 
+                onClick={onViewSummary}
+                className="w-full bg-sausage-800 text-white p-4 rounded-2xl flex justify-between items-center shadow-lg hover:bg-sausage-900 transition-colors"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="bg-sausage-600 px-3 py-1 rounded-lg font-bold">
+                        {totalItems}
+                    </div>
+                    <span className="font-bold text-lg">View Order</span>
+                </div>
+                <span className="font-bold text-xl">
+                    {totalPrice} {menuData.originalCurrency}
+                </span>
+            </button>
+        </div>
+      )}
     </div>
   );
 };
